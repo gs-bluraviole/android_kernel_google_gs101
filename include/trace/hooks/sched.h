@@ -445,6 +445,12 @@ DECLARE_HOOK(android_vh_set_task_comm,
 	TP_PROTO(struct task_struct *p),
 	TP_ARGS(p));
 
+DECLARE_HOOK(android_vh_map_util_freq,
+	TP_PROTO(unsigned long util, unsigned long freq,
+		unsigned long cap, unsigned long *next_freq),
+	TP_ARGS(util, freq, cap, next_freq));
+
+
 #endif /* _TRACE_HOOK_SCHED_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>
