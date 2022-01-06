@@ -29,7 +29,7 @@ config MALI_PIXEL_GPU_BTS
 
 config MALI_PIXEL_GPU_THERMAL
 	bool "Enable support for constraining GPU clocks due to thermal events"
-	depends on MALI_MIDGARD_DVFS && GPU_THERMAL && EXYNOS_THERMAL_V2
+	depends on MALI_MIDGARD_DVFS && GPU_THERMAL && (EXYNOS_THERMAL_V2 || GS101_THERMAL_V2)
 	default y
 	help
 		Sets up the GPU driver to register for thermal events that
@@ -38,7 +38,7 @@ config MALI_PIXEL_GPU_THERMAL
 
 config MALI_PIXEL_GPU_SECURE_RENDERING
 	bool "Enable Pixel GPU Secure Rendering Support"
-	depends on MALI_MIDGARD && ION_EXYNOS && EXYNOS_CONTENT_PATH_PROTECTION
+	depends on MALI_MIDGARD && EXYNOS_CONTENT_PATH_PROTECTION
 	default y
 	help
 		Enables support for the GPU to render into secure memory.
