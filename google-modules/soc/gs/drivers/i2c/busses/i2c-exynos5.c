@@ -870,7 +870,8 @@ static int exynos5_i2c_xfer_msg(struct exynos5_i2c *i2c,
 			cpumask_setall(&m);
 			cpumask_clear_cpu(cpu, &m);
 		}
-		irq_set_affinity_and_hint(i2c->irq, &m);
+		if (!IS_ENABLED(CONFIG_IRQ_SBALANCE))
+			irq_set_affinity_and_hint(i2c->irq, &m);
 		enable_irq(i2c->irq);
 	} else {
 		writel(HSI2C_INT_TRANSFER_DONE, i2c->regs + HSI2C_INT_ENABLE);
