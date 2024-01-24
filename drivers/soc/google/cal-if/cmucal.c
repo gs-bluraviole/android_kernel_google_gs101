@@ -202,7 +202,7 @@ unsigned int cmucal_get_id(char *name)
 	}
 
 	if (strstr(name, "IO") || strstr(name, "OSC")) {
-		for (i = 0; i < cmucal_pll_size; i++)
+		for (i = 0; i < cmucal_fixed_rate_size; i++)
 			if (!strcmp(name, cmucal_fixed_rate_list[i].clk.name)) {
 				id = cmucal_fixed_rate_list[i].clk.id;
 				return id;
