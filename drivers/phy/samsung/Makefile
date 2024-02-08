@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 
 CFLAGS_phy-exynos-usbdrd.o += -Wno-missing-prototypes
-CFLAGS_phy-exynos-usb3p1.o += -Wno-missing-prototypes
 
 obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
 obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
