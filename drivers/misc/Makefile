@@ -2,6 +2,7 @@
 #
 # Makefile for misc devices that really don't fit anywhere else.
 #
+CFLAGS_logbuffer.o += -Wno-missing-prototypes
 
 obj-$(CONFIG_IBM_ASM)		+= ibmasm/
 obj-$(CONFIG_IBMVMC)		+= ibmvmc.o

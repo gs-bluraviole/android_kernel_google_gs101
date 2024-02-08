@@ -104,6 +104,7 @@ int gvotable_copy_current_result(struct gvotable_election *el, void *vote,
 
 int gvotable_comparator_uint_max(void *a, void *b);
 int gvotable_comparator_uint_min(void *a, void *b);
+int gvotable_comparator_int(void *l, void *r);
 int gvotable_comparator_int_max(void *a, void *b);
 int gvotable_comparator_int_min(void *a, void *b);
 int gvotable_comparator_most_recent(void *a, void *b);
