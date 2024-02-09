@@ -752,7 +752,7 @@ static int process_rx(struct max77759_plat *chip, u16 status)
 	return 0;
 }
 
-struct max77759_compliance_warnings *init_compliance_warnings(struct max77759_plat *chip)
+static struct max77759_compliance_warnings *init_compliance_warnings(struct max77759_plat *chip)
 {
 	struct max77759_compliance_warnings *compliance_warnings;
 
@@ -1067,7 +1067,7 @@ static void vsafe0v_debounce_work(struct kthread_work *work)
 	tcpm_vbus_change(tcpci->port);
 }
 
-void disconnect_missing_rp_partner(struct max77759_plat *chip)
+static void disconnect_missing_rp_partner(struct max77759_plat *chip)
 {
 	union power_supply_propval val;
 	int ret;
@@ -2246,7 +2246,7 @@ void tcpm_put_partner_src_caps(u32 **src_pdo)
 }
 EXPORT_SYMBOL_GPL(tcpm_put_partner_src_caps);
 
-void max77759_bc12_is_running(struct max77759_plat *chip, bool running)
+static void max77759_bc12_is_running(struct max77759_plat *chip, bool running)
 {
 	if (chip) {
 		mutex_lock(&chip->data_path_lock);

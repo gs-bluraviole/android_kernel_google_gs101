@@ -193,17 +193,6 @@ bool bc12_get_status(struct bc12_status *bc12)
 }
 EXPORT_SYMBOL_GPL(bc12_get_status);
 
-/*
- * Call during disconnect to clear the chg_typ
- */
-void clear_chg_typ(struct bc12_status *bc12)
-{
-	mutex_lock(&bc12->lock);
-	bc12->usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
-	mutex_unlock(&bc12->lock);
-}
-EXPORT_SYMBOL_GPL(clear_chg_typ);
-
 void bc12_teardown(struct bc12_status *bc12)
 {
 	power_supply_put(bc12->usb_psy);

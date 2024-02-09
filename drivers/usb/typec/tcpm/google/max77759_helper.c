@@ -8,6 +8,8 @@
 #include <linux/regmap.h>
 #include <linux/delay.h>
 
+#include "max77759_helper.h"
+
 #define I2C_RETRY 3
 #define I2C_RETRY_DELAY_USLEEP_MIN 1000
 #define I2C_RETRY_DELAY_USLEEP_MAX 2000
