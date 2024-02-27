@@ -768,20 +768,12 @@ struct max77759_compliance_warnings *init_compliance_warnings(struct max77759_pl
 ssize_t compliance_warnings_to_buffer(struct max77759_compliance_warnings *compliance_warnings,
 				      char *buf)
 {
-	memset(buf, 0, PAGE_SIZE);
-	strncat(buf, "[", strlen("["));
-	if (compliance_warnings->other)
-		strncat(buf, "other, ", strlen("other, "));
-	if (compliance_warnings->debug_accessory)
-		strncat(buf, "debug-accessory, ", strlen("debug-accessory, "));
-	if (compliance_warnings->bc12)
-		strncat(buf, "bc12, ", strlen("bc12, "));
-	if (compliance_warnings->missing_rp)
-		strncat(buf, "missing_rp, ", strlen("missing_rp, "));
-	if (compliance_warnings->input_power_limited)
-		strncat(buf, "input_power_limited, ", strlen("input_power_limited, "));
-	strncat(buf, "]", strlen("]"));
-	return strnlen(buf, PAGE_SIZE);
+	return scnprintf(buf, PAGE_SIZE, "[%s%s%s%s%s]",
+			 compliance_warnings->other ? "other, " : "",
+			 compliance_warnings->debug_accessory ? "debug-accessory, " : "",
+			 compliance_warnings->bc12 ? "bc12, " : "",
+			 compliance_warnings->missing_rp ? "missing_rp, " : "",
+			 compliance_warnings->input_power_limited ? "input_power_limited, " : "");
 }
 
 void update_compliance_warnings(struct max77759_plat *chip, int warning, bool value)
