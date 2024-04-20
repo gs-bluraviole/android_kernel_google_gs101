@@ -32,6 +32,8 @@ VENDOR_RAMDISK_CMDS="modify_vendor_ramdisk"
 function modify_vendor_ramdisk() {
   ln -f init.recovery.gs101.rc init.recovery.oriole.rc
   ln -f init.recovery.gs101.rc init.recovery.raven.rc
+  ln -f init.recovery.gs101.rc init.recovery.bluejay.rc
 }
 
 EXT_MODULES_MAKEFILE=${KERNEL_DIR}/Makefile.ext_modules.slider
+
