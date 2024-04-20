@@ -431,10 +431,6 @@ s32 wl_cfg80211_wsec_info_pmk(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 static int wl_get_p2p_disc_ies(struct bcm_cfg80211 *cfg,
 	struct wireless_dev *wdev, u8 **p2p_ie, u16 *p2p_ie_len);
 
-/* SoftAP related parameters */
-#define DEFAULT_2G_SOFTAP_CHANNEL	1
-#define DEFAULT_2G_SOFTAP_CHANSPEC	0x1006
-#define DEFAULT_5G_SOFTAP_CHANNEL	149
 #define WL_MAX_NUM_CSA_COUNTERS		255
 
 #define MAX_VNDR_OUI_STR_LEN	256u
