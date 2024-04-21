@@ -71,11 +71,6 @@ VENDOR_BOOTCONFIG="androidboot.boot_devices=14700000.ufs"
 KERNEL_VENDOR_CMDLINE+=" swiotlb=noforce"
 KERNEL_VENDOR_CMDLINE+=" disable_dma32=on"
 
-AVB_SIGN_BOOT_IMG=1
-AVB_BOOT_PARTITION_SIZE=0x04000000
-AVB_BOOT_KEY=${ROOT_DIR}/prebuilts/kernel-build-tools/linux-x86/share/avb/testkey_rsa2048.pem
-AVB_BOOT_ALGORITHM=SHA256_RSA2048
-
 if [ -z "${FAST_BUILD}" ]; then
 COMPRESS_UNSTRIPPED_MODULES=1
 UNSTRIPPED_MODULES="
