@@ -14,9 +14,7 @@ M ?= $(shell pwd)
 KBUILD_OPTIONS += CONFIG_BIGOCEAN=m CONFIG_SLC_PARTITION_MANAGER=m \
 		  CONFIG_DEBUG_FS=m
 
-ccflags-y := -I$(KERNEL_SRC)/../google-modules/video/gchips
-
-EXTRA_CFLAGS	+= -I$(KERNEL_SRC)/../google-modules/video/gchips/include
+EXTRA_CFLAGS += -I$(srctree)/$(src)/include
 
 modules modules_install headers_install clean:
 	$(MAKE) -C $(KERNEL_SRC) M=$(M) \
