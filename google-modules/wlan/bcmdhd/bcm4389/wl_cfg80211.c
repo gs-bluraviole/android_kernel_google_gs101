@@ -14865,7 +14865,7 @@ wl_fillup_resp_params(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	struct cfg80211_connect_resp_params *resp_params;
 	struct wl_fils_info *fils_info = NULL;
 	struct wlc_ssid *ssid = NULL;
-	struct wiphy *wiphy = NULL;
+	struct wiphy *__maybe_unused wiphy = NULL;
 	s32 ret = BCME_OK;
 
 	fils_info = wl_to_fils_info(cfg);
