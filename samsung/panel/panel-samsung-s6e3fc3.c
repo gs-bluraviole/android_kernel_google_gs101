@@ -457,6 +457,51 @@ static void s6e3fc3_get_panel_rev(struct exynos_panel *ctx, u32 id)
 	exynos_panel_get_panel_rev(ctx, rev);
 }
 
+static bool check_for_8_bit_10_bit_cmds(struct exynos_panel *ctx,
+	const struct mipi_dsi_msg *msg, const bool is_last)
+{
+	static bool has_8_bit = false;
+	static bool has_10_bit = false;
+	static bool global_para_bit_set = false;
+	const u8 *tx_buf = msg->tx_buf;
+
+	if (global_para_bit_set && msg->tx_len == 2 && tx_buf[0] == 0xF2 && tx_buf[1] == 0xCC) {
+		has_10_bit = true;
+		if (!is_last)
+			dev_warn(ctx->dev, "10 bit DDIC command is not flushed!\n");
+	} else if (global_para_bit_set && msg->tx_len == 2 && tx_buf[0] == 0xF2 && tx_buf[1] == 0xC4) {
+		has_8_bit = true;
+		if (!is_last)
+			dev_warn(ctx->dev, "8 bit DDIC command is not flushed!\n");
+	}
+
+	global_para_bit_set = (
+		(msg->tx_len == 3 && tx_buf[0] == 0xB0 && tx_buf[1] == 0x28 && tx_buf[2] == 0xF2) ||
+		(msg->tx_len == 4 && tx_buf[0] == 0xB0 && tx_buf[1] == 0x00 && tx_buf[2] == 0x28 &&
+			tx_buf[3] == 0xF2));
+
+	if (has_8_bit && has_10_bit) {
+		has_8_bit = false;
+		has_10_bit = false;
+		return true;
+	}
+	if (is_last) {
+		has_8_bit = false;
+		has_10_bit = false;
+	}
+
+	return false;
+}
+
+static void s6e3fc3_on_queue_ddic_command(struct exynos_panel *ctx,
+	const struct mipi_dsi_msg *msg, const bool is_last)
+{
+	if (check_for_8_bit_10_bit_cmds(ctx, msg, is_last)) {
+		dev_warn(ctx->dev, "DSIM Contains both 8 and 10 bit DDIC commands in the same batch!\n");
+		dump_stack();
+	}
+}
+
 static const struct exynos_display_underrun_param underrun_param = {
 	.te_idle_us = 700,
 	.te_var = 1,
@@ -592,6 +637,7 @@ static const struct exynos_panel_funcs s6e3fc3_exynos_funcs = {
 	.get_te2_edges = exynos_panel_get_te2_edges,
 	.configure_te2_edges = exynos_panel_configure_te2_edges,
 	.update_te2 = s6e3fc3_update_te2,
+	.on_queue_ddic_cmd = s6e3fc3_on_queue_ddic_command,
 };
 
 const struct brightness_capability s6e3fc3_brightness_capability = {
