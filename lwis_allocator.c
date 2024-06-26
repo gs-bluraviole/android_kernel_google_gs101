@@ -174,9 +174,6 @@ int lwis_allocator_init(struct lwis_device *lwis_dev)
 		return -ENOMEM;
 	}
 
-	/* Initialize mutex */
-	spin_lock_init(&block_mgr->lock);
-
 	/* Empty hash table for allocated blocks */
 	hash_init(block_mgr->allocated_blocks);
 
@@ -233,10 +230,10 @@ void lwis_allocator_release(struct lwis_device *lwis_dev)
 	allocator_block_pool_free_locked(lwis_dev, &block_mgr->pool_256k);
 	allocator_block_pool_free_locked(lwis_dev, &block_mgr->pool_512k);
 
-	spin_lock_irqsave(&block_mgr->lock, flags);
+	spin_lock_irqsave(&lwis_dev->allocator_lock, flags);
 	kfree(block_mgr);
 	lwis_dev->block_mgr = NULL;
-	spin_unlock_irqrestore(&block_mgr->lock, flags);
+	spin_unlock_irqrestore(&lwis_dev->allocator_lock, flags);
 	mutex_unlock(&lwis_dev->client_lock);
 }
 
@@ -318,10 +315,10 @@ void *lwis_allocator_allocate(struct lwis_device *lwis_dev, size_t size, gfp_t g
 			kfree(block);
 			return NULL;
 		}
-		spin_lock_irqsave(&block_mgr->lock, flags);
+		spin_lock_irqsave(&lwis_dev->allocator_lock, flags);
 		block_mgr->pool_large.in_use_count++;
 		hash_add(block_mgr->allocated_blocks, &block->node, (unsigned long long)block->ptr);
-		spin_unlock_irqrestore(&block_mgr->lock, flags);
+		spin_unlock_irqrestore(&lwis_dev->allocator_lock, flags);
 		return block->ptr;
 	}
 
@@ -331,9 +328,9 @@ void *lwis_allocator_allocate(struct lwis_device *lwis_dev, size_t size, gfp_t g
 	}
 
 	/* Try to get free block from recycling block pool */
-	spin_lock_irqsave(&block_mgr->lock, flags);
+	spin_lock_irqsave(&lwis_dev->allocator_lock, flags);
 	block = allocator_free_block_get_locked(block_pool);
-	spin_unlock_irqrestore(&block_mgr->lock, flags);
+	spin_unlock_irqrestore(&lwis_dev->allocator_lock, flags);
 	if (block != NULL) {
 		return block->ptr;
 	}
@@ -355,7 +352,7 @@ void *lwis_allocator_allocate(struct lwis_device *lwis_dev, size_t size, gfp_t g
 		return NULL;
 	}
 
-	spin_lock_irqsave(&block_mgr->lock, flags);
+	spin_lock_irqsave(&lwis_dev->allocator_lock, flags);
 	block->next = block_pool->in_use;
 	if (block->next != NULL) {
 		block->next->prev = block;
@@ -363,7 +360,7 @@ void *lwis_allocator_allocate(struct lwis_device *lwis_dev, size_t size, gfp_t g
 	block_pool->in_use = block;
 	block_pool->in_use_count++;
 	hash_add(block_mgr->allocated_blocks, &block->node, (unsigned long long)block->ptr);
-	spin_unlock_irqrestore(&block_mgr->lock, flags);
+	spin_unlock_irqrestore(&lwis_dev->allocator_lock, flags);
 
 	return block->ptr;
 }
@@ -381,12 +378,12 @@ void lwis_allocator_free(struct lwis_device *lwis_dev, void *ptr)
 		return;
 	}
 
-	spin_lock_irqsave(&lwis_dev->block_mgr->lock, flags);
+	spin_lock_irqsave(&lwis_dev->allocator_lock, flags);
 
 	block_mgr = lwis_dev->block_mgr;
 	if (block_mgr == NULL) {
 		dev_err(lwis_dev->dev, "block_mgr is NULL\n");
-		spin_unlock_irqrestore(&block_mgr->lock, flags);
+		spin_unlock_irqrestore(&lwis_dev->allocator_lock, flags);
 		return;
 	}
 	hash_for_each_possible (block_mgr->allocated_blocks, blk, node, (unsigned long long)ptr) {
@@ -398,7 +395,7 @@ void lwis_allocator_free(struct lwis_device *lwis_dev, void *ptr)
 
 	if (block == NULL) {
 		dev_err(lwis_dev->dev, "Allocator free ptr not found\n");
-		spin_unlock_irqrestore(&block_mgr->lock, flags);
+		spin_unlock_irqrestore(&lwis_dev->allocator_lock, flags);
 		return;
 	}
 
@@ -416,20 +413,20 @@ void lwis_allocator_free(struct lwis_device *lwis_dev, void *ptr)
 		kvfree(block->ptr);
 		kfree(block);
 		block_mgr->pool_large.in_use_count--;
-		spin_unlock_irqrestore(&block_mgr->lock, flags);
+		spin_unlock_irqrestore(&lwis_dev->allocator_lock, flags);
 		return;
 	}
 
 	block_pool = allocator_get_block_pool(block_mgr, block->type);
 	if (block_pool == NULL) {
 		dev_err(lwis_dev->dev, "block type is invalid\n");
-		spin_unlock_irqrestore(&block_mgr->lock, flags);
+		spin_unlock_irqrestore(&lwis_dev->allocator_lock, flags);
 		return;
 	}
 
 	allocator_free_block_put_locked(block_pool, block);
 
-	spin_unlock_irqrestore(&block_mgr->lock, flags);
+	spin_unlock_irqrestore(&lwis_dev->allocator_lock, flags);
 
 	return;
 }
