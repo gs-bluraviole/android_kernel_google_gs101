@@ -88,6 +88,7 @@
 
 &max77759_chg {
 	max77759,psy-name = "main-charger";
+	max77759,wcin-inlim-headroom = <40000>;
 };
 
 &hsi2c_12 {
