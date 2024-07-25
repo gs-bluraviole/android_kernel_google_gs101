@@ -3452,7 +3452,7 @@ int kbase_pm_gpu_freq_init(struct kbase_device *kbdev)
 	/* find lowest frequency OPP */
 	opp_ptr = dev_pm_opp_find_freq_ceil(kbdev->dev, &found_freq);
 	if (IS_ERR(opp_ptr)) {
-		dev_dbg(kbdev->dev, "No OPPs found in device tree! Scaling timeouts using %llu kHz",
+		dev_err(kbdev->dev, "No OPPs found in device tree! Scaling timeouts using %llu kHz",
 			(unsigned long long)lowest_freq_khz);
 	} else {
 #if KERNEL_VERSION(4, 11, 0) <= LINUX_VERSION_CODE
