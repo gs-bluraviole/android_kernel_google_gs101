@@ -7570,7 +7570,7 @@ static ssize_t first_usage_date_store(struct device *dev,
 		return ret;
 
 	/* return if the device tree is set */
-	if (bhi_data->first_usage_date)
+	if (bhi_data->first_usage_date >= 0)
 		return count > 0 ? count : 0;
 
 	/*
@@ -7634,7 +7634,7 @@ static ssize_t first_usage_date_show(struct device *dev,
 	int ret;
 
 	/* return if the device tree is set */
-	if (bhi_data->first_usage_date)
+	if (bhi_data->first_usage_date >= 0)
 		return scnprintf(buf, PAGE_SIZE, "%d\n", bhi_data->first_usage_date);
 
 	ret = get_activation_date(&batt_drv->health_data, &tm);
@@ -10567,7 +10567,7 @@ static void google_battery_init_work(struct work_struct *work)
 	ret = of_property_read_u32(node, "google,first-usage-date",
 				   &batt_drv->health_data.bhi_data.first_usage_date);
 	if (ret < 0)
-		batt_drv->health_data.bhi_data.first_usage_date = 0;
+		batt_drv->health_data.bhi_data.first_usage_date = -1;
 
 	batt_drv->dc_irdrop = of_property_read_bool(node, "google,dc-irdrop");
 	if (batt_drv->dc_irdrop)
