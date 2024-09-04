@@ -3618,7 +3618,6 @@ static bool msc_health_pause(struct batt_drv *batt_drv, const ktime_t ttf,
 	return false;
 }
 
-
 /*
  * for logging, userspace should use
  *   deadline == 0 on fast replug (leave initial deadline ok)
@@ -3628,6 +3627,7 @@ static bool msc_health_pause(struct batt_drv *batt_drv, const ktime_t ttf,
  * return true if there was a change
  */
 static bool batt_health_set_chg_deadline(struct batt_chg_health *chg_health,
+					 long long ttf_with_margin,
 					 long long deadline_s)
 {
 	enum chg_health_state rest_state = chg_health->rest_state;
@@ -3659,10 +3659,15 @@ static bool batt_health_set_chg_deadline(struct batt_chg_health *chg_health,
 
 	} else { /* enabled from any previous state */
 		const ktime_t rest_deadline = get_boot_sec() + deadline_s;
+		enum chg_health_state new_rest_state = CHG_HEALTH_ENABLED;
 
 		/* ->always_on SOC overrides the deadline */
 		new_deadline = chg_health->rest_deadline != rest_deadline;
-		chg_health->rest_state = CHG_HEALTH_ENABLED;
+
+		if (rest_deadline < ttf_with_margin)
+			new_rest_state = CHG_HEALTH_DISABLED;
+
+		chg_health->rest_state = new_rest_state;
 		chg_health->rest_deadline = rest_deadline;
 	}
 
@@ -3682,7 +3687,7 @@ static bool msc_logic_health(struct batt_drv *batt_drv)
 	const ktime_t now = get_boot_sec();
 	int fv_uv = -1, cc_max = -1;
 	bool changed = false;
-	ktime_t ttf = 0;
+	ktime_t ttf = 0, safety_margin = 0;
 	int ret;
 
 	/* move to ENABLED if INACTIVE when aon_enabled is set */
@@ -3733,6 +3738,9 @@ static bool msc_logic_health(struct batt_drv *batt_drv)
 		goto done_exit;
 	}
 
+	if (batt_drv->health_safety_margin > 0)
+		safety_margin = batt_drv->health_safety_margin;
+
 	/*
 	 * rest_state here is either ENABLED or ACTIVE, transition to DISABLED
 	 * when the deadline cannot be met with the current rate. set a new
@@ -3743,8 +3751,9 @@ static bool msc_logic_health(struct batt_drv *batt_drv)
 	 * from CHG_HEALTH_USER_DISABLED.
 	 * TODO: consider adding a margin or debounce it.
 	 */
-	if (aon_enabled == false && rest_state == CHG_HEALTH_ACTIVE &&
-	    deadline > 0 && ttf != -1 && now + ttf > deadline) {
+	if (aon_enabled == false &&
+	    (rest_state == CHG_HEALTH_ACTIVE || rest_state == CHG_HEALTH_ENABLED) &&
+	    deadline > 0 && ttf != -1 && now + ttf + safety_margin > deadline) {
 		rest_state = CHG_HEALTH_DISABLED;
 		goto done_exit;
 	}
@@ -7128,6 +7137,7 @@ static ssize_t batt_set_chg_deadline(struct device *dev,
 	struct power_supply *psy = container_of(dev, struct power_supply, dev);
 	struct batt_drv *batt_drv =(struct batt_drv *)
 					power_supply_get_drvdata(psy);
+	ktime_t ttf_with_margin = 0;
 	long long deadline_s;
 	bool changed;
 
@@ -7141,7 +7151,12 @@ static ssize_t batt_set_chg_deadline(struct device *dev,
 		return -EINVAL;
 	}
 
-	changed = batt_health_set_chg_deadline(&batt_drv->chg_health,
+	if (batt_ttf_estimate(&ttf_with_margin, batt_drv) < 0)
+		ttf_with_margin = LLONG_MAX;
+	else if (batt_drv->health_safety_margin > 0)
+		ttf_with_margin += batt_drv->health_safety_margin;
+
+	changed = batt_health_set_chg_deadline(&batt_drv->chg_health, (long long)ttf_with_margin,
 					       deadline_s);
 	mutex_unlock(&batt_drv->chg_lock);
 
