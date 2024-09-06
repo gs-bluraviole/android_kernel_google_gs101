@@ -219,6 +219,12 @@
 		max77759,chg-term-voltage = <4400>;
 
 		#thermal-sensor-cells = <1>;
+
+		max77759_gpio: max77759_gpio {
+			gpio-controller;
+			#gpio-cells = <2>;
+			ngpios = <1>;
+		};
 	};
 
 };
