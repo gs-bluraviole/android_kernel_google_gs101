@@ -747,16 +747,15 @@ int gbms_msc_voltage_idx_merge_tiers(const struct gbms_chg_profile *profile,
 {
 	int cc_max;
 	int vbatt_idx = 0;
-	const int vbatt_last_idx = gbms_msc_get_last_voltage_idx(profile, temp_idx);
 
 	if (!profile)
 		return 0;
 
-	while (vbatt_idx < vbatt_last_idx &&
+	while (vbatt_idx < profile->volt_nb_limits - 1 &&
 	       vbatt > profile->volt_limits[vbatt_idx])
 		vbatt_idx++;
 
-	if (vbatt_idx != vbatt_last_idx) {
+	if (vbatt_idx != profile->volt_nb_limits - 1) {
 		const int vt = profile->volt_limits[vbatt_idx];
 		const int headr = profile->fv_uv_resolution * 3;
 
@@ -768,7 +767,7 @@ int gbms_msc_voltage_idx_merge_tiers(const struct gbms_chg_profile *profile,
 		return vbatt_idx;
 
 	cc_max = GBMS_CCCM_LIMITS(profile, temp_idx, vbatt_idx);
-	while (vbatt_idx < vbatt_last_idx - 1 &&
+	while (vbatt_idx < profile->volt_nb_limits - 2 &&
 		cc_max == GBMS_CCCM_LIMITS(profile, temp_idx, vbatt_idx + 1))
 			vbatt_idx++;
 
