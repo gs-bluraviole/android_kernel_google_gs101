@@ -44,6 +44,9 @@ build:kunit --notrim --//private/devices/google/common:kunit
 # For compatibility, Recommand to use --config=testing or --config=kunit.
 build:pixel_kunit --config=kunit
 
+# Build 16k page size kernel
+build:16k --page_size=16k --config=no_download_gki --config=no_download_gki_fips140
+
 # Placeholders for soc specific bazelrc files. Add as many as you need.
 try-import %workspace%/.c1.bazelrc
 try-import %workspace%/.c2.bazelrc
