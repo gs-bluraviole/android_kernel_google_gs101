@@ -75,6 +75,7 @@
 #define RL_STATE_VOTER	"rl_state"
 #define MSC_HEALTH_VOTER "chg_health"
 #define BPST_DETECT_VOTER "bpst_detect"
+#define FCRU_CHARGE_VOTER "fcr_update"
 
 #define UICURVE_MAX	3
 
@@ -99,6 +100,7 @@
 #define BHI_ROUND_INDEX(index) 		\
 	(((index) + BHI_ALGO_ROUND_INDEX) / 100)
 
+#define DEFAULT_FORCE_FCR_UPDATE_CYCLE	10
 
 /* TODO: this is for Adaptive charging, rename */
 enum batt_health_ui {
@@ -711,6 +713,11 @@ struct batt_drv {
 
 	/* for testing drain battery not shutdown */
 	int restrict_level_critical;
+
+	/* force charge to 100% even with charge limit to update FCR */
+	int force_fcr_update_cycle;
+	int last_full_charge;
+	bool vote_force_full_charge;
 };
 
 static int gbatt_get_temp(struct batt_drv *batt_drv, int *temp);
@@ -1782,10 +1789,12 @@ static bool batt_charge_to_limit_enable(const struct batt_chg_health *chg_health
 #define MIN_DELTA_FOR_LOG_S 60
 static int batt_ttf_estimate(ktime_t *res, struct batt_drv *batt_drv)
 {
-	qnum_t raw_full = ssoc_point_full - qnum_rconst(SOC_ROUND_BASE);
 	qnum_t soc_raw = ssoc_get_real_raw(&batt_drv->ssoc_state);
 	ktime_t estimate = 0;
 	int rc = 0, max_ratio = 0, ssoc_full = SSOC_FULL;
+	const bool skip_fcr_update = batt_drv->hist_data_saved_cnt - batt_drv->last_full_charge <
+				     batt_drv->force_fcr_update_cycle;
+	qnum_t raw_full;
 
 	if (batt_drv->ssoc_state.buck_enabled != 1)
 		return -EINVAL;
@@ -1795,13 +1804,19 @@ static int batt_ttf_estimate(ktime_t *res, struct batt_drv *batt_drv)
 		goto done;
 	}
 
-	if (batt_drv->charging_policy == CHARGING_POLICY_VOTE_LONGLIFE) {
-		ssoc_full = LONGLIFE_CHARGE_STOP_LEVEL;
-		raw_full = qnum_fromint(ssoc_full) - qnum_rconst(SOC_ROUND_BASE);
-	} else if (batt_charge_to_limit_enable(&batt_drv->chg_health)) {
-		ssoc_full = batt_drv->chg_health.always_on_soc;
-		raw_full = qnum_fromint(ssoc_full) - qnum_rconst(SOC_ROUND_BASE);
+	if (skip_fcr_update) {
+		if (batt_drv->charging_policy == CHARGING_POLICY_VOTE_LONGLIFE)
+			ssoc_full = LONGLIFE_CHARGE_STOP_LEVEL;
+		else if (batt_charge_to_limit_enable(&batt_drv->chg_health))
+			ssoc_full = batt_drv->chg_health.always_on_soc;
+	} else if (batt_drv->charging_policy == CHARGING_POLICY_VOTE_LONGLIFE &&
+		   !batt_drv->vote_force_full_charge) {
+		gvotable_cast_long_vote(batt_drv->charging_policy_votable, FCRU_CHARGE_VOTER,
+					CHARGING_POLICY_VOTE_FORCE_FULL_CHARGE, true);
+		batt_drv->vote_force_full_charge = true;
 	}
+
+	raw_full = qnum_fromint(ssoc_full) - qnum_rconst(SOC_ROUND_BASE);
 
 	/* TTF is 0 when over ssoc_full */
 	if (ssoc_get_capacity(&batt_drv->ssoc_state) >= ssoc_full) {
@@ -10453,6 +10468,7 @@ static void google_battery_work(struct work_struct *work)
 	const int prev_ssoc = ssoc_get_capacity(ssoc_state);
 	int present, fg_status, batt_temp, ret;
 	bool notify_psy_changed = false;
+	bool update_last_full_charge = false;
 
 	pr_debug("battery work item\n");
 
@@ -10580,8 +10596,10 @@ static void google_battery_work(struct work_struct *work)
 		}
 
 		/* slow down the updates at full */
-		if (full && batt_drv->chg_done)
+		if (full && batt_drv->chg_done) {
 			update_interval *= UPDATE_INTERVAL_AT_FULL_FACTOR;
+			update_last_full_charge = true;
+		}
 	}
 
 	/* notifications for this are debounced  */
@@ -10665,6 +10683,23 @@ static void google_battery_work(struct work_struct *work)
 
 	/* TODO: we might not need to do this all the time */
 	batt_cycle_count_update(batt_drv, ssoc_get_real(ssoc_state));
+
+	if (update_last_full_charge) {
+		batt_drv->last_full_charge = batt_drv->hist_data_saved_cnt;
+		ret = gbms_storage_write(GBMS_TAG_FCRU, &batt_drv->last_full_charge,
+					 GBMS_FCRU_LEN);
+		if (ret < 0)
+			pr_err("failed to store FCNU (%d)\n", ret);
+
+		dev_info(batt_drv->device, "force full charged at cycle %d\n",
+			 batt_drv->last_full_charge);
+
+		if (batt_drv->vote_force_full_charge) {
+			gvotable_cast_long_vote(batt_drv->charging_policy_votable, FCRU_CHARGE_VOTER,
+						CHARGING_POLICY_VOTE_FORCE_FULL_CHARGE, false);
+			batt_drv->vote_force_full_charge = false;
+		}
+	}
 
 reschedule:
 
@@ -12006,6 +12041,21 @@ static void google_battery_init_work(struct work_struct *work)
 	/* power metrics */
 	schedule_delayed_work(&batt_drv->power_metrics.work,
 			      msecs_to_jiffies(batt_drv->power_metrics.polling_rate * 1000));
+
+	/* configure force full charge when charge limit is enable */
+	ret = of_property_read_s32(node, "google,force-fcn-update-cycle",
+				   &batt_drv->force_fcr_update_cycle);
+	if (ret != 0)
+		batt_drv->force_fcr_update_cycle = DEFAULT_FORCE_FCR_UPDATE_CYCLE;
+
+	ret = gbms_storage_read(GBMS_TAG_FCRU, &batt_drv->last_full_charge, GBMS_FCRU_LEN);
+	if (ret < 0)
+		dev_err(batt_drv->device, "failed to read GBMS_TAG_FCRU (%d)\n", ret);
+
+	/* if force_fcr_update_cycle has default value of eeprom */
+	if (batt_drv->last_full_charge == 0xFFFF)
+		batt_drv->last_full_charge = 0;
+
 
 	pr_info("google_battery init_work done\n");
 

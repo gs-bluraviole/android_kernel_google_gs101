@@ -833,6 +833,7 @@ enum charging_policy_vote {
        CHARGING_POLICY_VOTE_ADAPTIVE_AON = 2,
        CHARGING_POLICY_VOTE_ADAPTIVE_AC = 3,
        CHARGING_POLICY_VOTE_LONGLIFE = 4,
+       CHARGING_POLICY_VOTE_FORCE_FULL_CHARGE = 5,
 };
 
 #define to_cooling_device(_dev)	\
