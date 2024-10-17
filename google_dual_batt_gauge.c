@@ -828,6 +828,7 @@ static int gdbatt_gbms_get_property(struct power_supply *psy,
 	case GBMS_PROP_CAPACITY_FADE_RATE:
 	case GBMS_PROP_CAPACITY_FADE_RATE_FCR:
 	case GBMS_PROP_BATT_ID:
+	case GBMS_PROP_AAFV:
 		val->prop.intval = fg_1.prop.intval;
 		break;
 	case GBMS_PROP_RECAL_FG:
@@ -894,6 +895,18 @@ static int gdbatt_gbms_set_property(struct power_supply *psy,
 	case GBMS_PROP_RECAL_FG:
 		/* TODO: under porting */
 		break;
+	case GBMS_PROP_AAFV:
+		if (dual_fg_drv->first_fg_psy) {
+			ret = GPSY_SET_PROP(dual_fg_drv->first_fg_psy, psp, val->prop.intval);
+			if (ret < 0)
+				pr_err("Cannot set aafv to the first FG, ret=%d\n", ret);
+		}
+		if (dual_fg_drv->second_fg_psy) {
+			ret = GPSY_SET_PROP(dual_fg_drv->second_fg_psy, psp, val->prop.intval);
+			if (ret < 0)
+				pr_err("Cannot set aafv to the second FG, ret=%d\n", ret);
+		}
+		break;
 	default:
 		pr_debug("%s: route to gdbatt_set_property, psp:%d\n", __func__, psp);
 		return -ENODATA;
@@ -912,6 +925,7 @@ static int gdbatt_gbms_property_is_writeable(struct power_supply *psy,
 {
 	switch (psp) {
 	case GBMS_PROP_BATT_CE_CTRL:
+	case GBMS_PROP_AAFV:
 		return 1;
 	default:
 		break;

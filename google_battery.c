@@ -5243,8 +5243,14 @@ static int msc_logic(struct batt_drv *batt_drv)
 	if (vbatt_idx != batt_drv->vbatt_idx || temp_idx != batt_drv->temp_idx) {
 		const int last_vbatt_idx = gbms_msc_get_last_voltage_idx(profile, temp_idx);
 
-		if (vbatt_idx == last_vbatt_idx)
+		if (vbatt_idx == last_vbatt_idx) {
+			int ret;
+
 			aafv_update_voltage(batt_drv, &fv_uv, last_vbatt_idx);
+			ret = GPSY_SET_PROP(fg_psy, GBMS_PROP_AAFV, fv_uv);
+			if (ret < 0)
+				pr_err("pass aafv to FG failed %d", ret);
+		}
 	}
 
 	batt_prlog(batt_prlog_level(changed),

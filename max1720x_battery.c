@@ -243,6 +243,9 @@ struct max1720x_chip {
 
 	/* buffer for recording learning history */
 	struct maxfg_capture_buf cb_lh;
+
+	/* AAFV: Aged Adjusted Float Voltage */
+	int aafv;
 };
 
 #define MAX1720_EMPTY_VOLTAGE(profile, temp, cycle) \
@@ -2699,6 +2702,9 @@ static int max1720x_gbms_get_property(struct power_supply *psy,
 		if (chip->gauge_type == MAX_M5_GAUGE_TYPE)
 			val->prop.intval = max_m5_recal_state(chip->model_data);
 		break;
+	case GBMS_PROP_AAFV:
+		val->prop.intval = chip->aafv;
+		break;
 	default:
 		pr_debug("%s: route to max1720x_get_property, psp:%d\n", __func__, psp);
 		err = -ENODATA;
@@ -2781,6 +2787,9 @@ static int max1720x_gbms_set_property(struct power_supply *psy,
 	case GBMS_PROP_RECAL_FG:
 		max1720x_set_recalibration(chip, val->prop.intval);
 		break;
+	case GBMS_PROP_AAFV:
+		chip->aafv = val->prop.intval;
+		break;
 	default:
 		pr_debug("%s: route to max1720x_set_property, psp:%d\n", __func__, psp);
 		return -ENODATA;
@@ -2798,6 +2807,7 @@ static int max1720x_gbms_property_is_writeable(struct power_supply *psy,
 	switch (psp) {
 	case GBMS_PROP_BATT_CE_CTRL:
 	case GBMS_PROP_HEALTH_ACT_IMPEDANCE:
+	case GBMS_PROP_AAFV:
 		return 1;
 	default:
 		break;
