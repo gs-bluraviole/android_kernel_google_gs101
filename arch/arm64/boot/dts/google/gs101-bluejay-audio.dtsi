@@ -57,7 +57,6 @@
 		compatible = "cirrus,cs40l26a";
 		reg = <0x43>;
 
-		dev-name = "cs40l26a";	/* sysfs folder name */
 		input-device-name = "cs40l26_input";	/* input device name */
 		pinctrl-names = "default";
 		pinctrl-0 = <&hapt_amp_irq &hapt_amp_rst &hapt_amp_trig>;

@@ -8,6 +8,7 @@
 
 &google_battery {
 	google,chg-battery-capacity = <4306>;
+	google,first-usage-date = <0>;
 };
 
 &max77759_fg {
