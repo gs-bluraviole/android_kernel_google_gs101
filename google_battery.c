@@ -287,6 +287,13 @@ enum batt_aafv_state {
 	BATT_AAFV_MAX,
 };
 
+enum batt_aact_state {
+	BATT_AACT_UNKNOWN = -1,
+	BATT_AACT_DISABLED = 0,
+	BATT_AACT_ENABLED = 1,
+	BATT_AACT_MAX,
+};
+
 #define BATT_TEMP_RECORD_THR 3
 /* discharge saved after charge */
 #define SD_CHG_START 0
@@ -526,6 +533,7 @@ struct batt_drv {
 	/* for testing */
 	int fake_aacr_cc;
 	int fake_aafv_cc;
+	int fake_aact_cc;
 
 	/* props */
 	int soh;
@@ -649,6 +657,10 @@ struct batt_drv {
 	int aafv_cliff_offset;
 	struct logbuffer *bd_log;
 	struct mutex aafv_state_lock;
+
+	/* AACT: Aged Adjusted Charge Table */
+	enum batt_aact_state aact_state;
+	struct mutex aact_state_lock;
 
 	/* BHI: updated on disconnect, EOC */
 	struct health_data health_data;
@@ -5287,16 +5299,18 @@ static void aacr_update_chg_table(struct batt_drv *batt_drv)
 {
 	u32 capacity = aacr_get_capacity(batt_drv);
 
-	if (capacity != batt_drv->chg_profile.capacity_ma) {
-		gbms_logbuffer_devlog(batt_drv->ttf_stats.ttf_log, batt_drv->device,
-		LOGLEVEL_INFO, 0, LOGLEVEL_INFO, "AACR: capacity:%d->%d, state:%d, "
-		"algo:%d, cycle_grace:%d, cycle_max:%d, min_cap_rate:%d, cliff_cap_rate:%d",
-		batt_drv->chg_profile.capacity_ma, capacity, batt_drv->aacr_state,
-		batt_drv->aacr_algo, batt_drv->aacr_cycle_grace, batt_drv->aacr_cycle_max,
-		batt_drv->aacr_min_capacity_rate, batt_drv->aacr_cliff_capacity_rate);
-		gbms_init_chg_table(&batt_drv->chg_profile, batt_drv->device->of_node, capacity);
-		google_battery_dump_profile(&batt_drv->chg_profile);
-	}
+	if (capacity == batt_drv->chg_profile.capacity_ma)
+		return;
+
+	gbms_logbuffer_devlog(batt_drv->ttf_stats.ttf_log, batt_drv->device,
+			      LOGLEVEL_INFO, 0, LOGLEVEL_INFO,
+			      "AACR: capacity:%d->%d, state:%d, algo:%d, cycle_grace:%d, cycle_max:%d, min_cap_rate:%d, cliff_cap_rate:%d",
+			      batt_drv->chg_profile.capacity_ma, capacity, batt_drv->aacr_state,
+			      batt_drv->aacr_algo, batt_drv->aacr_cycle_grace,
+			      batt_drv->aacr_cycle_max, batt_drv->aacr_min_capacity_rate,
+			      batt_drv->aacr_cliff_capacity_rate);
+	gbms_init_chg_table(&batt_drv->chg_profile, batt_drv->device->of_node, capacity);
+	google_battery_dump_profile(&batt_drv->chg_profile);
 }
 
 /* cell fault: disconnect of one of the battery cells */
@@ -5397,6 +5411,60 @@ static int batt_init_bpst_profile(struct batt_drv *batt_drv)
 	return 0;
 }
 
+/* AACT ------------------------------------------------------------------- */
+
+/* call holding mutex_lock(&batt_drv->aact_state_lock); */
+static void aact_reset(struct gbms_chg_profile *profile)
+{
+	profile->aact_nb_limits = 0;
+	profile->aact_idx = 0;
+}
+
+/* call holding mutex_lock(&batt_drv->aact_state_lock); */
+static int aact_get_index(const struct batt_drv *batt_drv)
+{
+	int cycle_count = batt_drv->cycle_count;
+
+	if (batt_drv->fake_aact_cc)
+		cycle_count = batt_drv->fake_aact_cc;
+
+	return gbms_aact_get_index(&batt_drv->chg_profile, cycle_count);
+}
+
+/* call holding mutex_lock(&batt_drv->aact_state_lock); */
+static int aact_update_chg_table(struct batt_drv *batt_drv)
+{
+	struct gbms_chg_profile *profile = &batt_drv->chg_profile;
+	struct device_node *node = batt_drv->device->of_node;
+	int ret;
+
+	if (!profile->aact_init_profile && batt_drv->aact_state == BATT_AACT_ENABLED) {
+		/* init AACT charge table */
+		ret = gbms_init_aact_profile(profile, node);
+		if (ret < 0)
+			return ret;
+
+		gbms_init_chg_table(profile, node, batt_drv->battery_capacity);
+	} else if (profile->aact_init_profile && batt_drv->aact_state == BATT_AACT_DISABLED) {
+		/* reset AACT */
+		aact_reset(profile);
+
+		/* init default charge table */
+		ret = gbms_init_chg_profile(profile, node);
+		if (ret < 0)
+			return ret;
+
+		gbms_init_chg_table(profile, node, batt_drv->battery_capacity);
+	}
+
+	if (batt_drv->aact_state == BATT_AACT_ENABLED)
+		profile->aact_idx = aact_get_index(batt_drv);
+
+	return 0;
+}
+
+/* ------------------------------------------------------------------------- */
+
 /* call holding mutex_lock(&batt_drv->chg_lock); */
 static int batt_chg_logic(struct batt_drv *batt_drv)
 {
@@ -5491,6 +5559,26 @@ static int batt_chg_logic(struct batt_drv *batt_drv)
 		/* google_resistance is calculated while charging */
 		if (bhi_data->res_state.estimate_filter)
 			batt_res_state_set(&bhi_data->res_state, true);
+
+		mutex_lock(&batt_drv->aact_state_lock);
+		err = aact_update_chg_table(batt_drv);
+		if (err < 0) {
+			struct gbms_chg_profile *profile = &batt_drv->chg_profile;
+			struct device_node *node = batt_drv->device->of_node;
+			int rc;
+
+			/* reset AACT */
+			aact_reset(profile);
+
+			/* set state to unknown and init default charge table */
+			batt_drv->aact_state = BATT_AACT_UNKNOWN;
+			rc = gbms_init_chg_profile(profile, node);
+			if (rc == 0)
+				gbms_init_chg_table(profile, node, aacr_get_capacity(batt_drv));
+
+			pr_err("Cannot update aact charge table (%d)\n", err);
+		}
+		mutex_unlock(&batt_drv->aact_state_lock);
 
 		aacr_update_chg_table(batt_drv);
 
@@ -6264,6 +6352,7 @@ static ssize_t debug_get_chg_raw_profile(struct file *filp,
 	if (!tmp)
 		return -ENOMEM;
 
+	mutex_lock(&batt_drv->aact_state_lock);
 	if (raw_profile_cycles) {
 		struct gbms_chg_profile profile;
 		int count;
@@ -6271,6 +6360,14 @@ static ssize_t debug_get_chg_raw_profile(struct file *filp,
 		len = gbms_init_chg_profile(&profile, batt_drv->device->of_node);
 		if (len < 0)
 			goto exit_done;
+
+		if (batt_drv->aact_state == BATT_AACT_ENABLED) {
+			len = gbms_init_aact_profile(&profile, batt_drv->device->of_node);
+			if (len < 0)
+				goto exit_done;
+
+			profile.aact_idx = aact_get_index(batt_drv);
+		}
 
 		/* len is the capacity */
 		len = aacr_get_capacity_at_cycle(batt_drv, raw_profile_cycles);
@@ -6291,6 +6388,7 @@ static ssize_t debug_get_chg_raw_profile(struct file *filp,
 	len = simple_read_from_buffer(buf, count, ppos, tmp, strlen(tmp));
 
 exit_done:
+	mutex_unlock(&batt_drv->aact_state_lock);
 	kfree(tmp);
 	return len;
 }
@@ -8201,6 +8299,68 @@ static ssize_t aafv_offset_show(struct device *dev,
 
 static const DEVICE_ATTR_RO(aafv_offset);
 
+/* AACT ------------------------------------------------------------------- */
+
+static ssize_t aact_state_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct power_supply *psy = container_of(dev, struct power_supply, dev);
+	struct batt_drv *batt_drv = power_supply_get_drvdata(psy);
+	int val, ret = 0;
+
+	ret = kstrtoint(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+
+	mutex_lock(&batt_drv->aact_state_lock);
+
+	if (batt_drv->aact_state == val)
+		goto done;
+
+	if (val == BATT_AACT_ENABLED && batt_drv->aact_state != BATT_AACT_DISABLED) {
+		mutex_unlock(&batt_drv->aact_state_lock);
+		return -EINVAL;
+	}
+
+	dev_info(batt_drv->device, "AACT: aact_state: %d -> %d\n", batt_drv->aact_state, val);
+	batt_drv->aact_state = val;
+
+	ret = aact_update_chg_table(batt_drv);
+	if (ret < 0) {
+		struct gbms_chg_profile *profile = &batt_drv->chg_profile;
+		struct device_node *node = batt_drv->device->of_node;
+		int err;
+
+		/* reset AACT */
+		aact_reset(profile);
+
+		/* set state to unknown and init default charge table */
+		batt_drv->aact_state = BATT_AACT_UNKNOWN;
+		err = gbms_init_chg_profile(profile, node);
+		if (err == 0)
+			gbms_init_chg_table(profile, node, aacr_get_capacity(batt_drv));
+
+		mutex_unlock(&batt_drv->aact_state_lock);
+		return ret;
+	}
+
+done:
+	mutex_unlock(&batt_drv->aact_state_lock);
+	return count;
+}
+
+static ssize_t aact_state_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct power_supply *psy = container_of(dev, struct power_supply, dev);
+	struct batt_drv *batt_drv = power_supply_get_drvdata(psy);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", batt_drv->aact_state);
+}
+
+static const DEVICE_ATTR_RW(aact_state);
+
 /* Swelling  --------------------------------------------------------------- */
 
 static ssize_t swelling_data_show(struct device *dev,
@@ -9358,6 +9518,10 @@ static int batt_init_fs(struct batt_drv *batt_drv)
 	ret = device_create_file(&batt_drv->psy->dev, &dev_attr_aafv_offset);
 	if (ret)
 		dev_err(&batt_drv->psy->dev, "Failed to create aafv offset\n");
+	/* aact */
+	ret = device_create_file(&batt_drv->psy->dev, &dev_attr_aact_state);
+	if (ret)
+		dev_err(&batt_drv->psy->dev, "Failed to create aact state\n");
 
 	/* health and health index */
 	ret = device_create_file(&batt_drv->psy->dev, &dev_attr_swelling_data);
@@ -9478,16 +9642,16 @@ static int batt_init_debugfs(struct batt_drv *batt_drv)
 	debugfs_create_u32("blf_collect_now", 0600, de, &batt_drv->blf_collect_now);
 
 	/* defender */
-	debugfs_create_u32("fake_capacity", 0600, de,
-			    &batt_drv->fake_capacity);
+	debugfs_create_u32("fake_capacity", 0600, de, &batt_drv->fake_capacity);
 
 	/* aacr test */
-	debugfs_create_u32("fake_aacr_cc", 0600, de,
-			    &batt_drv->fake_aacr_cc);
+	debugfs_create_u32("fake_aacr_cc", 0600, de, &batt_drv->fake_aacr_cc);
 
 	/* aafv test */
-	debugfs_create_u32("fake_aafv_cc", 0600, de,
-			    &batt_drv->fake_aafv_cc);
+	debugfs_create_u32("fake_aafv_cc", 0600, de, &batt_drv->fake_aafv_cc);
+
+	/* aact test */
+	debugfs_create_u32("fake_aact_cc", 0600, de, &batt_drv->fake_aact_cc);
 
 	/* health charging (adaptive charging) */
 	debugfs_create_file("chg_health_thr_soc", 0600, de, batt_drv,
@@ -11427,6 +11591,7 @@ static void google_battery_init_work(struct work_struct *work)
 	mutex_init(&batt_drv->hda_tz_lock);
 	mutex_init(&batt_drv->aacr_state_lock);
 	mutex_init(&batt_drv->aafv_state_lock);
+	mutex_init(&batt_drv->aact_state_lock);
 
 	ret = of_property_read_u32(node, "google,batt-init-delay", &init_delay_ms);
 	if (ret < 0)
@@ -11974,6 +12139,9 @@ static int google_battery_probe(struct platform_device *pdev)
 	batt_drv->aafv_max_offset = AAFV_MAX_OFFSET_DEFAULT;
 	batt_drv->aafv_cliff_cycle = AAFV_CLIFF_CYCLE_DEFAULT;
 	batt_drv->aafv_cliff_offset = AAFV_CLIFF_OFFSET_DEFAULT;
+
+	/* AACT server side */
+	batt_drv->aact_state = BATT_AACT_DISABLED;
 
 	/* create the sysfs node */
 	batt_init_fs(batt_drv);

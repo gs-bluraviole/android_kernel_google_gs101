@@ -966,7 +966,7 @@ static int gdbatt_init_pack_chg_profile(struct gbms_chg_profile *pack_profile,
 	/* chg-battery-capacity is in mAh, chg-cc-limits relative to 100 */
 	for (ti = 0; ti < pack_profile->temp_nb_limits - 1; ti++) {
 		for (vi = 0; vi < pack_profile->volt_nb_limits; vi++) {
-			ccm = GBMS_CCCM_LIMITS(pack_profile, ti, vi);
+			ccm = GBMS_CCCM_LIMITS_GET(pack_profile, ti, vi);
 			ccm *= capacity_ma * 10;
 
 			GBMS_CCCM_LIMITS_SET(pack_profile, ti, vi) = ccm;
