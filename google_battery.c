@@ -9912,6 +9912,12 @@ static int batt_history_data_work(struct batt_drv *batt_drv)
 	if (cycle_cnt <= 0)
 		return -EIO;
 
+	/* update hist_data_saved_cnt when cycle count has been fixed */
+	if (cycle_cnt < batt_drv->cycle_count) {
+		batt_drv->cycle_count = cycle_cnt;
+		batt_drv->hist_data_saved_cnt = cycle_cnt - 1;
+	}
+
 	if (batt_drv->blf_collect_now) {
 		pr_info("MSC_HIST cycle_cnt:%d->%d saved_cnt=%d\n",
 			cycle_cnt, batt_drv->blf_collect_now,
