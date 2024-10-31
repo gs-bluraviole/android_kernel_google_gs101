@@ -227,4 +227,8 @@ int get_roam_channel_list(struct bcm_cfg80211 *cfg, chanspec_t target_chan, chan
 	int n_channels, const wlc_ssid_t *ssid, int ioctl_ver);
 void set_roam_band(int band);
 #endif /* ESCAN_CHANNEL_CACHE */
+extern s32
+wl_cfgscan_get_bw_chspec(chanspec_t *chspec, u32 bw);
+extern void wl_connected_channel_debuggability(struct bcm_cfg80211 * cfg,
+	struct net_device * ndev);
 #endif /* _wl_cfgscan_h_ */

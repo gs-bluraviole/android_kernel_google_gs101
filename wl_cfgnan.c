@@ -2001,7 +2001,11 @@ wl_cfgnan_set_if_addr(struct bcm_cfg80211 *cfg)
 	}
 #ifdef WL_NMI_IF
 	/* copy new nmi addr to dedicated NMI interface */
-	NETDEV_ADDR_SET(cfg->nmi_ndev, ETHER_ADDR_LEN, if_addr.octet, ETHER_ADDR_LEN);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+	__dev_addr_set(cfg->nmi_ndev, if_addr.octet, ETHER_ADDR_LEN);
+#else
+	eacopy(if_addr.octet, cfg->nmi_ndev->dev_addr);
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0) */
 #endif /* WL_NMI_IF */
 	return ret;
 fail:
@@ -10148,7 +10152,11 @@ wl_cfgnan_register_nmi_ndev(struct bcm_cfg80211 *cfg)
 	ndev->netdev_ops = &wl_cfgnan_nmi_if_ops;
 
 	/* Register with a dummy MAC addr */
-	NETDEV_ADDR_SET(ndev, ETHER_ADDR_LEN, temp_addr, ETHER_ADDR_LEN);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+	__dev_addr_set(ndev, temp_addr, ETHER_ADDR_LEN);
+#else
+	eacopy(temp_addr, ndev->dev_addr);
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0) */
 
 	ndev->ieee80211_ptr = wdev;
 	wdev->netdev = ndev;

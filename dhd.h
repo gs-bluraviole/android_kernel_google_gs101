@@ -2325,6 +2325,8 @@ typedef enum dhd_attach_states
 #define DHD_PID_KT_INVALID		-1
 /* Value -2 means we are unsuccessful in both creating the kthread and tasklet */
 #define DHD_PID_KT_TL_INVALID		-2
+/* Value -3 means kthread terminated  */
+#define DHD_PID_KT_TERMINATED		-3
 
 /* default reporting period */
 #define ECOUNTERS_DEFAULT_PERIOD	0
@@ -4009,6 +4011,7 @@ extern void dhdpcie_block_runtime_pm(dhd_pub_t *dhdp);
 extern bool dhdpcie_is_resume_done(dhd_pub_t *dhdp);
 extern void dhd_runtime_pm_disable(dhd_pub_t *dhdp);
 extern void dhd_runtime_pm_enable(dhd_pub_t *dhdp);
+extern bool dhd_is_rpm_thread_alive(dhd_pub_t *pub);
 #ifdef RPM_FAST_TRIGGER
 /* Requirement is 20msec, but keep it 10msec to account for any scheduling latencies */
 #define RPM_FAST_TRIGGER_THR 10

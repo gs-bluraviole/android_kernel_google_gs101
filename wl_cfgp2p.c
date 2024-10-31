@@ -1136,7 +1136,8 @@ wl_cfgp2p_escan(struct bcm_cfg80211 *cfg, struct net_device *dev, u16 active_sca
 
 	ret = wldev_iovar_setbuf_bsscfg(pri_dev, "p2p_scan",
 		memblk, memsize, cfg->ioctl_buf, WLC_IOCTL_MAXLEN, bssidx, &cfg->ioctl_buf_sync);
-	WL_INFORM(("P2P_SEARCH sync ID: %d, bssidx: %d\n", sync_id, bssidx));
+	WL_INFORM(("P2P_SEARCH sync ID:%d bssidx:%d trigger:%d\n",
+			sync_id, bssidx, p2p_scan_purpose));
 	if (ret == BCME_OK) {
 		wl_set_p2p_status(cfg, SCANNING);
 	}
@@ -1158,15 +1159,21 @@ wl_cfgp2p_act_frm_search(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	u32 chan_cnt = 0;
 	u16 *default_chan_list = NULL;
 	p2p_scan_purpose_t p2p_scan_purpose = P2P_SCAN_AFX_PEER_NORMAL;
-	if (!p2p_is_on(cfg) || ndev == NULL || bssidx == WL_INVALID)
-		return -EINVAL;
+
 	WL_TRACE_HW4((" Enter\n"));
-	if (bssidx == wl_to_p2p_bss_bssidx(cfg, P2PAPI_BSSCFG_PRIMARY))
+	if (!p2p_is_on(cfg) || ndev == NULL || bssidx == WL_INVALID) {
+		return -EINVAL;
+	}
+
+	if (bssidx == wl_to_p2p_bss_bssidx(cfg, P2PAPI_BSSCFG_PRIMARY)) {
 		bssidx = wl_to_p2p_bss_bssidx(cfg, P2PAPI_BSSCFG_DEVICE);
-	if (channel)
+	}
+
+	if (channel) {
 		chan_cnt = AF_PEER_SEARCH_CNT;
-	else
+	} else {
 		chan_cnt = SOCIAL_CHAN_CNT;
+	}
 
 	if (cfg->afx_hdl->pending_tx_act_frm && cfg->afx_hdl->is_active) {
 		wl_action_frame_v1_t *action_frame;
@@ -1206,9 +1213,12 @@ wl_cfgp2p_act_frm_search(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 			WL_CHANSPEC_BW_20, WL_CHANSPEC_BAND_2G);
 #endif /* WL_6G_320_SUPPORT */
 	}
+
+	mutex_lock(&cfg->scan_sync);
 	ret = wl_cfgp2p_escan(cfg, ndev, true, chan_cnt,
 		default_chan_list, WL_P2P_DISC_ST_SEARCH,
 		WL_SCAN_ACTION_START, bssidx, NULL, p2p_scan_purpose);
+	mutex_unlock(&cfg->scan_sync);
 	MFREE(cfg->osh, default_chan_list, chan_cnt * sizeof(*default_chan_list));
 exit:
 	return ret;
@@ -2687,11 +2697,12 @@ wl_cfgp2p_add_p2p_disc_if(struct bcm_cfg80211 *cfg)
 	memcpy(wdev->address, wl_to_p2p_bss_macaddr(cfg, P2PAPI_BSSCFG_DEVICE), ETHER_ADDR_LEN);
 
 #if defined(WL_NEWCFG_PRIVCMD_SUPPORT)
-	if (cfg->p2p_net)
+	if (cfg->p2p_net) {
 		NETDEV_ADDR_SET(cfg->p2p_net, ETHER_ADDR_LEN,
 				wl_to_p2p_bss_macaddr(cfg,
-						      P2PAPI_BSSCFG_DEVICE),
+					P2PAPI_BSSCFG_DEVICE),
 				ETHER_ADDR_LEN);
+	}
 #endif /* WL_NEWCFG_PRIVCMD_SUPPORT */
 
 	/* store p2p wdev ptr for further reference. */

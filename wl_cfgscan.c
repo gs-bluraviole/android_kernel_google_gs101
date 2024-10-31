@@ -6992,6 +6992,7 @@ wl_acs_check_scc(struct bcm_cfg80211 *cfg, drv_acs_params_t *parameter,
 	chanspec_t sta_chanspec, int qty, uint32 *pList)
 {
 	bool scc = FALSE;
+	chanspec_t cur_chanspec = INVCHANSPEC;
 
 	if (!(parameter->freq_bands & CHSPEC_TO_WLC_BAND(sta_chanspec))) {
 		return scc;
@@ -7024,9 +7025,26 @@ wl_acs_check_scc(struct bcm_cfg80211 *cfg, drv_acs_params_t *parameter,
 #endif /* DHD_ACS_CHECK_SCC_2G_ACTIVE_CH */
 
 	if (scc == TRUE) {
-		parameter->scc_chspec = sta_chanspec;
-		parameter->freq_bands = CHSPEC_TO_WLC_BAND(sta_chanspec);
-		WL_INFORM_MEM(("SCC case, ACS pick up STA chanspec:0x%x\n", sta_chanspec));
+		cur_chanspec = sta_chanspec;
+
+		WL_INFORM_MEM(("sta connected case. chosen:0x%x\n", cur_chanspec));
+		if ((CHSPEC_BAND(cur_chanspec) == WL_CHANSPEC_BAND_5G) &&
+			((CHSPEC_BW(cur_chanspec) == WL_CHANSPEC_BW_320) ||
+			(CHSPEC_BW(cur_chanspec) == WL_CHANSPEC_BW_160))) {
+			/* max bw restricted to 80MHz */
+			if (wl_cfgscan_get_bw_chspec((chanspec_t *)&cur_chanspec,
+				WL_CHANSPEC_BW_80)) {
+				WL_ERR(("bw config failed for chosen chspec\n"));
+				cur_chanspec = INVCHANSPEC;
+				return FALSE;
+			}
+			WL_INFORM_MEM(("5G AP restricted to 80Mhz. chosen:0x%x\n",
+				cur_chanspec));
+		}
+
+		parameter->scc_chspec = cur_chanspec;
+		parameter->freq_bands = CHSPEC_TO_WLC_BAND(cur_chanspec);
+		WL_INFORM_MEM(("SCC case, ACS pick up STA chanspec:0x%x\n", cur_chanspec));
 	}
 	return scc;
 }
@@ -7155,4 +7173,45 @@ wl_handle_acs_concurrency_cases(struct bcm_cfg80211 *cfg, drv_acs_params_t *para
 		}
 	}
 	return BCME_OK;
+}
+
+s32
+wl_cfgscan_get_bw_chspec(chanspec_t *chspec, u32 bw)
+{
+	chanspec_t cur_chspec = *chspec;
+
+#ifdef WL_BW320MHZ
+	*chspec = wf_create_chspec_from_primary(wf_chspec_primary20_chan(cur_chspec),
+		bw, CHSPEC_BAND(cur_chspec), 0);
+#else
+	*chspec = wf_create_chspec_from_primary(wf_chspec_primary20_chan(cur_chspec),
+		bw, CHSPEC_BAND(cur_chspec));
+#endif /* WL_BW320MHZ */
+	if (!wf_chspec_valid(*chspec)) {
+		WL_ERR(("invalid chanspec\n"));
+		return BCME_ERROR;
+	}
+
+	WL_INFORM_MEM(("cur_chspec:%x new_chspec:0x%x BW:%d chan:%d\n",
+			cur_chspec, *chspec, bw,
+			wf_chspec_primary20_chan(*chspec)));
+	return BCME_OK;
+}
+
+void
+wl_connected_channel_debuggability(struct bcm_cfg80211 * cfg, struct net_device * ndev)
+{
+	chanspec_t *chanspec;
+	struct ieee80211_channel *chan;
+	u32 center_freq;
+	struct wiphy *wiphy = bcmcfg_to_wiphy(cfg);
+
+	chanspec = (chanspec_t *)wl_read_prof(cfg, ndev, WL_PROF_CHAN);
+	center_freq = wl_channel_to_frequency(wf_chspec_ctlchan(*chanspec),
+			CHSPEC_BAND(*chanspec));
+
+	chan = ieee80211_get_channel(wiphy, center_freq);
+	if (chan) {
+		WL_INFORM_MEM(("Connected center_freq:%d flags:%x\n", center_freq, chan->flags));
+	}
 }

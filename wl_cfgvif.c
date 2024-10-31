@@ -5453,6 +5453,7 @@ int wl_chspec_chandef(chanspec_t chanspec,
 			chan_type = NL80211_CHAN_HT20;
 			break;
 		case WL_CHANSPEC_BW_40:
+#ifdef WL_FORCE_40BW_CHANDEF
 		{
 			if (CHSPEC_SB_UPPER(chanspec)) {
 				channel += CH_10MHZ_APART;
@@ -5461,6 +5462,11 @@ int wl_chspec_chandef(chanspec_t chanspec,
 			}
 		}
 			chan_type = NL80211_CHAN_HT40PLUS;
+#else
+			/* Use 20MHz BW for chandef */
+			channel = wf_chspec_primary20_chan(chanspec);
+			chan_type = NL80211_CHAN_HT20;
+#endif
 			break;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 8, 0))

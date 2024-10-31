@@ -1634,6 +1634,7 @@ dhd_dump(dhd_pub_t *dhdp, char *buf, int buflen)
 
 	/* Base DHD info */
 	bcm_bprintf(strbuf, "%s\n", dhd_version);
+	bcm_bprintf(strbuf, "%s\n", fw_version);
 	bcm_bprintf(strbuf, "\n");
 	bcm_bprintf(strbuf, "pub.up %d pub.txoff %d pub.busstate %d\n",
 	            dhdp->up, dhdp->txoff, dhdp->busstate);

@@ -10414,6 +10414,7 @@ int dhd_edl_ring_hdr_write(dhd_pub_t *dhd, msgbuf_ring_t *ring, void *file, cons
 	char *buf = NULL, *ptr = NULL;
 	uint8 *msg_addr = NULL;
 	uint16	rd = 0;
+	uint size = 0;
 
 	if (ring == NULL) {
 		DHD_ERROR(("%s: Ring not initialised, failed to dump ring contents\n",
@@ -10422,7 +10423,8 @@ int dhd_edl_ring_hdr_write(dhd_pub_t *dhd, msgbuf_ring_t *ring, void *file, cons
 		goto done;
 	}
 
-	buf = MALLOCZ(dhd->osh, (D2HRING_EDL_MAX_ITEM * D2HRING_EDL_HDR_SIZE));
+	size = (D2HRING_EDL_MAX_ITEM * D2HRING_EDL_HDR_SIZE);
+	buf = MALLOCZ(dhd->osh, size);
 	if (buf == NULL) {
 		DHD_ERROR(("%s: buffer allocation failed\n", __FUNCTION__));
 		ret = BCME_ERROR;
@@ -10432,12 +10434,13 @@ int dhd_edl_ring_hdr_write(dhd_pub_t *dhd, msgbuf_ring_t *ring, void *file, cons
 
 	for (; nitems < D2HRING_EDL_MAX_ITEM; nitems++, rd++) {
 		msg_addr = (uint8 *)ring->dma_buf.va + (rd * ring->item_len);
-		ret = memcpy_s(ptr, D2HRING_EDL_HDR_SIZE, (char *)msg_addr, ring->item_len);
+		ret = memcpy_s(ptr, size, (char *)msg_addr, D2HRING_EDL_HDR_SIZE);
 		if (ret) {
 			DHD_ERROR(("D2HRING_EDL_HDR(%d) memcpy failed:%d, destsz:%d, n:%d\n",
 				rd, ret, D2HRING_EDL_HDR_SIZE, ring->item_len));
 		}
 		ptr += D2HRING_EDL_HDR_SIZE;
+		size -= D2HRING_EDL_HDR_SIZE;
 	}
 	if (file) {
 		ret = dhd_os_write_file_posn(file, file_posn, buf,
