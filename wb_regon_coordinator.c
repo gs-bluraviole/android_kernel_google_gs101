@@ -88,7 +88,6 @@ struct wbrc_pvt_data {
 	int wbrc_bt_dev_major_number;		/* BT char dev major number */
 	struct class *wbrc_bt_dev_class;	/* BT char dev class */
 	struct device *wbrc_bt_dev_device;	/* BT char dev */
-	struct mutex wbrc_mutex;		/* mutex to synchronise */
 	bool bt_dev_opened;			/* To check if bt dev open is called */
 	wait_queue_head_t bt_reset_waitq;	/* waitq to wait till bt reset is done */
 	unsigned int bt_reset_ack;		/* condition variable to be check for bt reset */
@@ -96,15 +95,16 @@ struct wbrc_pvt_data {
 	unsigned int wlan_reset_ack;		/* condition variable to be check for wlan reset */
 	wait_queue_head_t wlan_on_waitq;	/* waitq to wait till wlan on is done */
 	unsigned int wlan_on_ack;		/* condition variable to be check for wlan on */
-	wait_queue_head_t outmsg_waitq;		/* wait queue for poll */
 	char wl2bt_message[WBRC_MSG_LEN];	/* message to communicate with Bt stack */
 	bool read_data_available;		/* condition to check if read data is present */
 };
 
 static struct wbrc_pvt_data *g_wbrc_data;
+static struct mutex wbrc_mutex;
+static wait_queue_head_t outmsg_waitq;
 
-#define WBRC_LOCK(wbrc_data)	{if (wbrc_data) mutex_lock(&(wbrc_data)->wbrc_mutex);}
-#define WBRC_UNLOCK(wbrc_data)	{if (wbrc_data) mutex_unlock(&(wbrc_data)->wbrc_mutex);}
+#define WBRC_LOCK(wbrc_mutex)           mutex_lock(&wbrc_mutex)
+#define WBRC_UNLOCK(wbrc_mutex)         mutex_unlock(&wbrc_mutex)
 
 int wbrc_wl2bt_reset(void);
 int wbrc_bt_reset_ack(struct wbrc_pvt_data *wbrc_data);
@@ -129,12 +129,19 @@ static struct file_operations wbrc_bt_dev_fops = {
 static ssize_t wbrc_bt_dev_read(struct file *filep, char *buffer, size_t len,
                              loff_t *offset)
 {
-	struct wbrc_pvt_data *wbrc_data = filep->private_data;
+	struct wbrc_pvt_data *wbrc_data;
 	int err_count = 0;
 	int ret = 0;
 
-	WBRC_LOCK(wbrc_data);
+	WBRC_LOCK(wbrc_mutex);
 	pr_info("%s\n", __func__);
+	wbrc_data = g_wbrc_data;
+	if (!wbrc_data) {
+		pr_err("%s: wbrc not inited !\n", __func__);
+		ret = -EFAULT;
+		goto exit;
+	}
+
 	if (wbrc_data->read_data_available == FALSE) {
 		goto exit;
 	}
@@ -156,19 +163,25 @@ static ssize_t wbrc_bt_dev_read(struct file *filep, char *buffer, size_t len,
 	wbrc_data->read_data_available = FALSE;
 
 exit:
-	WBRC_UNLOCK(wbrc_data);
+	WBRC_UNLOCK(wbrc_mutex);
 	return ret;
 }
 
 static ssize_t wbrc_bt_dev_write(struct file *filep, const char *buffer,
 	size_t len, loff_t *offset)
 {
-	struct wbrc_pvt_data *wbrc_data = filep->private_data;
+	struct wbrc_pvt_data *wbrc_data;
 	int err_count = 0;
 	int ret = 0;
 	char message[WBRC_MSG_LEN] = {};
 
-	WBRC_LOCK(wbrc_data);
+	WBRC_LOCK(wbrc_mutex);
+	wbrc_data = g_wbrc_data;
+	if (!wbrc_data) {
+		pr_err("%s: wbrc not inited !\n", __func__);
+		ret = -EFAULT;
+		goto exit;
+	}
 
 	pr_info("%s Received %zu bytes\n", __func__, len);
 	if (len != WBRC_MSG_LEN) {
@@ -208,22 +221,41 @@ static ssize_t wbrc_bt_dev_write(struct file *filep, const char *buffer,
 	}
 
 exit:
-	WBRC_UNLOCK(wbrc_data);
+	WBRC_UNLOCK(wbrc_mutex);
 	return ret;
 }
 
 static __poll_t wbrc_bt_dev_poll(struct file *filep, poll_table *wait)
 {
-	struct wbrc_pvt_data *wbrc_data = filep->private_data;
+	struct wbrc_pvt_data *wbrc_data;
 	__poll_t mask = 0;
 
-	poll_wait(filep, &wbrc_data->outmsg_waitq, wait);
+	pr_info("%s\n", __func__);
+	WBRC_LOCK(wbrc_mutex);
+	wbrc_data = g_wbrc_data;
+	if (!wbrc_data) {
+		pr_err("%s: wbrc not inited !\n", __func__);
+		WBRC_UNLOCK(wbrc_mutex);
+		return EPOLLHUP;
+	}
+	WBRC_UNLOCK(wbrc_mutex);
+
+	poll_wait(filep, &outmsg_waitq, wait);
+
+	WBRC_LOCK(wbrc_mutex);
+	wbrc_data = g_wbrc_data;
+	if (!wbrc_data) {
+		pr_err("%s: wbrc not inited after poll_wait\n", __func__);
+		WBRC_UNLOCK(wbrc_mutex);
+		return EPOLLHUP;
+	}
 
 	if (wbrc_data->read_data_available)
 		mask |= EPOLLIN | EPOLLRDNORM;
 
 	if (!wbrc_data->bt_dev_opened)
 		mask |= EPOLLHUP;
+	WBRC_UNLOCK(wbrc_mutex);
 
 	return mask;
 }
@@ -232,23 +264,30 @@ int wbrc_reset_wait_on_condition(wait_queue_head_t *reset_waitq, uint *var, uint
 
 static int wbrc_bt_dev_open(struct inode *inodep, struct file *filep)
 {
-	struct wbrc_pvt_data *wbrc_data = g_wbrc_data;
+	struct wbrc_pvt_data *wbrc_data;
 	int ret = 0;
-	WBRC_LOCK(wbrc_data);
-	if (wbrc_data->bt_dev_opened) {
-		pr_err("%s already opened\n", __func__);
-		WBRC_UNLOCK(wbrc_data);
+	WBRC_LOCK(wbrc_mutex);
+	wbrc_data = g_wbrc_data;
+	if (!wbrc_data) {
+		pr_err("%s: wbrc not inited !\n", __func__);
+		WBRC_UNLOCK(wbrc_mutex);
 		return -EFAULT;
 	}
+
+	if (wbrc_data->bt_dev_opened) {
+		pr_err("%s already opened\n", __func__);
+		WBRC_UNLOCK(wbrc_mutex);
+		return -EFAULT;
+	}
+
 	wbrc_data->bt_dev_opened = TRUE;
 	pr_info("%s Device opened %d time(s)\n", __func__,
 		wbrc_data->bt_dev_opened);
-	filep->private_data = wbrc_data;
 
 	/* If wlan_on_ack is false means, the dev_open is called during WLAN ON */
 	if (wbrc_data->wlan_on_ack == FALSE) {
 		/* unlock mutex before wait as wbrc_wlan_on_ack also holds same mutex  */
-		WBRC_UNLOCK(wbrc_data);
+		WBRC_UNLOCK(wbrc_mutex);
 
 		pr_info("%s: wait for wlan_on_ack\n", __func__);
 		/* Wait till wlan is ON */
@@ -261,7 +300,7 @@ static int wbrc_bt_dev_open(struct inode *inodep, struct file *filep)
 		}
 	} else {
 		pr_info("%s: wlan_on_ack is TRUE\n", __func__);
-		WBRC_UNLOCK(wbrc_data);
+		WBRC_UNLOCK(wbrc_mutex);
 	}
 
 	pr_info("%s Done\n", __func__);
@@ -271,12 +310,19 @@ static int wbrc_bt_dev_open(struct inode *inodep, struct file *filep)
 
 static int wbrc_bt_dev_release(struct inode *inodep, struct file *filep)
 {
-	struct wbrc_pvt_data *wbrc_data = filep->private_data;
-	WBRC_LOCK(wbrc_data);
+	struct wbrc_pvt_data *wbrc_data;
+	WBRC_LOCK(wbrc_mutex);
+	wbrc_data = g_wbrc_data;
+	if (!wbrc_data) {
+		pr_err("%s: wbrc not inited !\n", __func__);
+		WBRC_UNLOCK(wbrc_mutex);
+		return -EFAULT;
+	}
+
 	pr_info("%s Device closed %d\n", __func__, wbrc_data->bt_dev_opened);
 	wbrc_data->bt_dev_opened = FALSE;
-	WBRC_UNLOCK(wbrc_data);
-	wake_up_interruptible(&wbrc_data->outmsg_waitq);
+	WBRC_UNLOCK(wbrc_mutex);
+	wake_up_interruptible(&outmsg_waitq);
 	return 0;
 }
 
@@ -292,7 +338,7 @@ void wbrc_signal_bt_reset(struct wbrc_pvt_data *wbrc_data)
 	wbrc_data->read_data_available = TRUE;
 	smp_wmb();
 
-	wake_up_interruptible(&wbrc_data->outmsg_waitq);
+	wake_up_interruptible(&outmsg_waitq);
 }
 
 int wbrc_init(void)
@@ -304,11 +350,11 @@ int wbrc_init(void)
 	if (wbrc_data == NULL) {
 		return -ENOMEM;
 	}
-	mutex_init(&wbrc_data->wbrc_mutex);
+	mutex_init(&wbrc_mutex);
 	init_waitqueue_head(&wbrc_data->bt_reset_waitq);
 	init_waitqueue_head(&wbrc_data->wlan_reset_waitq);
 	init_waitqueue_head(&wbrc_data->wlan_on_waitq);
-	init_waitqueue_head(&wbrc_data->outmsg_waitq);
+	init_waitqueue_head(&outmsg_waitq);
 
 	/* Set wlan_on_ack in bootup so that 1st BT ON without WLAN does not wait */
 	wbrc_data->wlan_on_ack = TRUE;
@@ -353,14 +399,37 @@ err_register:
 
 void wbrc_exit(void)
 {
-	struct wbrc_pvt_data *wbrc_data = g_wbrc_data;
+	struct wbrc_pvt_data *wbrc_data;
 	pr_info("%s\n", __func__);
-	wake_up_interruptible(&wbrc_data->outmsg_waitq);
+	WBRC_LOCK(wbrc_mutex);
+	wbrc_data = g_wbrc_data;
+	if (!wbrc_data) {
+		pr_err("%s: wbrc not inited !\n", __func__);
+		WBRC_UNLOCK(wbrc_mutex);
+		return;
+	}
+	WBRC_UNLOCK(wbrc_mutex);
+
+	/*
+	 * wake up threads blocked on waitqueue before freeing resource
+	 * awake threads are expected to be processed first by preempting with mutex
+	 */
+	wake_up_interruptible(&outmsg_waitq);
+
+	WBRC_LOCK(wbrc_mutex);
+	wbrc_data = g_wbrc_data;
+	if (!wbrc_data) {
+		pr_err("%s: wbrc not inited after wakeup\n", __func__);
+		WBRC_UNLOCK(wbrc_mutex);
+		return;
+	}
+
 	device_destroy(wbrc_data->wbrc_bt_dev_class, MKDEV(wbrc_data->wbrc_bt_dev_major_number, 0));
 	class_destroy(wbrc_data->wbrc_bt_dev_class);
 	unregister_chrdev(wbrc_data->wbrc_bt_dev_major_number, DEVICE_NAME);
 	kfree(wbrc_data);
 	g_wbrc_data = NULL;
+	WBRC_UNLOCK(wbrc_mutex);
 }
 
 #ifndef BCMDHD_MODULAR
@@ -394,16 +463,23 @@ wbrc_reset_wait_on_condition(wait_queue_head_t *reset_waitq, uint *var, uint con
 
 int wbrc_wlan_on_ack(void)
 {
-	struct wbrc_pvt_data *wbrc_data = g_wbrc_data;
+	struct wbrc_pvt_data *wbrc_data;
 
-	WBRC_LOCK(wbrc_data);
+	WBRC_LOCK(wbrc_mutex);
+	wbrc_data = g_wbrc_data;
+	if (!wbrc_data) {
+		pr_err("%s: wbrc not inited !\n", __func__);
+		WBRC_UNLOCK(wbrc_mutex);
+		return -1;
+	}
+
 	if (wbrc_data->wlan_on_ack == FALSE) {
 		pr_info("%s: set wlan_on_ack\n", __func__);
 		wbrc_data->wlan_on_ack = TRUE;
 		smp_wmb();
 		wake_up(&wbrc_data->wlan_on_waitq);
 	}
-	WBRC_UNLOCK(wbrc_data);
+	WBRC_UNLOCK(wbrc_mutex);
 
 	return 0;
 }
@@ -412,10 +488,10 @@ int wbrc_wlan_on_started(void)
 {
 	struct wbrc_pvt_data *wbrc_data = g_wbrc_data;
 
-	WBRC_LOCK(wbrc_data);
+	WBRC_LOCK(wbrc_mutex);
 	pr_info("%s: reset wlan_on_ack\n", __func__);
 	wbrc_data->wlan_on_ack = FALSE;
-	WBRC_UNLOCK(wbrc_data);
+	WBRC_UNLOCK(wbrc_mutex);
 
 	return 0;
 }
@@ -432,15 +508,19 @@ int wbrc_bt_reset_ack(struct wbrc_pvt_data *wbrc_data)
 
 int wbrc_wl2bt_reset(void)
 {
-	struct wbrc_pvt_data *wbrc_data = g_wbrc_data;
-
-	pr_info("%s\n", __func__);
-
-	WBRC_LOCK(wbrc_data);
+	struct wbrc_pvt_data *wbrc_data;
+	pr_err("%s: enter \n", __func__);
+	WBRC_LOCK(wbrc_mutex);
+	wbrc_data = g_wbrc_data;
+	if (!wbrc_data) {
+		pr_err("%s: not allocated mem\n", __func__);
+		WBRC_UNLOCK(wbrc_mutex);
+		return -1;
+	}
 
 	if (!wbrc_data->bt_dev_opened) {
 		pr_info("%s: no BT\n", __func__);
-		WBRC_UNLOCK(wbrc_data);
+		WBRC_UNLOCK(wbrc_mutex);
 		return -1;
 	}
 
@@ -449,7 +529,7 @@ int wbrc_wl2bt_reset(void)
 
 	wbrc_signal_bt_reset(wbrc_data);
 
-	WBRC_UNLOCK(wbrc_data);
+	WBRC_UNLOCK(wbrc_mutex);
 	/* Wait till BT reset is done */
 	wbrc_reset_wait_on_condition(&wbrc_data->bt_reset_waitq,
 		&wbrc_data->bt_reset_ack, TRUE);
@@ -493,7 +573,7 @@ wbrc_wl_reset_ack(struct wbrc_pvt_data *wbrc_data)
 	wbrc_data->read_data_available = TRUE;
 
 	smp_wmb();
-	wake_up_interruptible(&wbrc_data->outmsg_waitq);
+	wake_up_interruptible(&outmsg_waitq);
 
 	smp_wmb();
 	wake_up(&wbrc_data->wlan_reset_waitq);
