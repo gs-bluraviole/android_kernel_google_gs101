@@ -2754,11 +2754,11 @@ static int max1720x_gbms_set_property(struct power_supply *psy,
 
 		} else if (ce->cable_in) {
 			if (ce->estimate_state == ESTIMATE_PENDING)
-				cancel_delayed_work_sync(&ce->settle_timer);
+				cancel_delayed_work(&ce->settle_timer);
 
 			/* race with batt_ce_capacityfiltered_work() */
-			batt_ce_stop_estimation(ce, ESTIMATE_NONE);
 			batt_ce_dump_data(ce, chip->ce_log);
+			batt_ce_stop_estimation(ce, ESTIMATE_NONE);
 			ce->cable_in = false;
 		}
 		mutex_unlock(&ce->batt_ce_lock);
