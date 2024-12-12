@@ -31,12 +31,28 @@
 					google,batt-id = <2>;
 					google,aacr-ref-cycles = <100 200 300 400 500 600 700>;
 					google,aacr-ref-fade10 = <4   16  27  38  49  58  68 >;
+					google,aafv-ref-cycles = <
+						200  250  300  350  400  450  500  550
+						600  650  700  750  800  850  900  950
+					>;
+					google,aafv-ref-offset = <
+						  0  10  10  20  20  30  30  40
+						 40  50  50  60  60  70  80  90
+					>;
 				};
 
 				google,batt-id-3-lsn {
 					google,batt-id = <3>;
 					google,aacr-ref-cycles = <100 200 300 400 500 600 700>;
 					google,aacr-ref-fade10 = <6   21  34  46  57  67  77>;
+					google,aafv-ref-cycles = <
+						200  250  300  350  400  450  500  550
+						600  650  700  750  800  850  900  950
+					>;
+					google,aafv-ref-offset = <
+						  0  10  10  20  20  30  30  40
+						 40  50  50  60  60  70  80  90
+					>;
 				};
 			};
 
