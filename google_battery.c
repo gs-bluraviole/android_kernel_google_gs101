@@ -662,6 +662,12 @@ struct batt_drv {
 	enum batt_aact_state aact_state;
 	struct mutex aact_state_lock;
 
+	/* AACP: Configuration Version for AAFV, AACR and AACT for the device */
+	int aacp_version;
+
+	/* AACC: Age adjusted cycle count */
+	int aacc;
+
 	/* BHI: updated on disconnect, EOC */
 	struct health_data health_data;
 	struct swelling_data sd;
@@ -3962,7 +3968,7 @@ static u32 aacr_get_capacity(struct batt_drv *batt_drv)
 	if (batt_drv->fake_aacr_cc)
 		cycle_count = batt_drv->fake_aacr_cc;
 	else
-		cycle_count = batt_drv->cycle_count;
+		cycle_count = batt_drv->aacc;
 
 	if (batt_drv->aacr_state == BATT_AACR_DISABLED)
 		goto exit_done;
@@ -4271,7 +4277,7 @@ static int bhi_calc_cap_index(int algo, struct batt_drv *batt_drv)
 
 	if (bhi_algo_has_bounds(algo)) {
 		const int cycle_count = batt_drv->fake_aacr_cc ?
-					batt_drv->fake_aacr_cc : batt_drv->cycle_count;
+					batt_drv->fake_aacr_cc : batt_drv->aacc;
 
 		capacity_health = bhi_algo_apply_bounds(algo, capacity_health, cycle_count,
 							bhi_data);
@@ -4867,7 +4873,7 @@ static int batt_init_aafv_profile(struct batt_drv *batt_drv)
 
 static u32 aafv_update_state(struct batt_drv *batt_drv)
 {
-	int cycle_count = batt_drv->cycle_count;
+	int cycle_count = batt_drv->aacc;
 	int offset, aafv_offset = 0;
 
 	mutex_lock(&batt_drv->aafv_state_lock);
@@ -4912,6 +4918,16 @@ static void aafv_update_voltage(struct batt_drv *batt_drv, int *fv_uv, const int
 	aafv_fv = last_fv - aafv_offset;
 	if (aafv_fv > penultimate_fv && aafv_fv < last_fv)
 		*fv_uv = (int)aafv_fv;
+}
+
+/* AACC ------------------------------------------------------------------- */
+
+static void aacc_update_cycle_count(struct batt_drv *batt_drv)
+{
+	int cycle_count = batt_drv->cycle_count;
+
+	/* TODO: AACC is TBD */
+	batt_drv->aacc = cycle_count;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -5423,7 +5439,7 @@ static void aact_reset(struct gbms_chg_profile *profile)
 /* call holding mutex_lock(&batt_drv->aact_state_lock); */
 static int aact_get_index(const struct batt_drv *batt_drv)
 {
-	int cycle_count = batt_drv->cycle_count;
+	int cycle_count = batt_drv->aacc;
 
 	if (batt_drv->fake_aact_cc)
 		cycle_count = batt_drv->fake_aact_cc;
@@ -5514,6 +5530,9 @@ static int batt_chg_logic(struct batt_drv *batt_drv)
 		batt_reset_chg_drv_state(batt_drv);
 		batt_update_cycle_count(batt_drv);
 		batt_rl_reset(batt_drv);
+
+		/* aacc: cycle count */
+		aacc_update_cycle_count(batt_drv);
 
 		/* charging_policy: vote AC false when disconnected */
 		gvotable_cast_long_vote(batt_drv->charging_policy_votable, "MSC_AC",
@@ -8361,6 +8380,50 @@ static ssize_t aact_state_show(struct device *dev,
 
 static const DEVICE_ATTR_RW(aact_state);
 
+/* AACP ------------------------------------------------------------------- */
+
+static ssize_t aacp_version_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct power_supply *psy = container_of(dev, struct power_supply, dev);
+	struct batt_drv *batt_drv = power_supply_get_drvdata(psy);
+	int value, ret = 0;
+
+	ret = kstrtoint(buf, 0, &value);
+	if (ret < 0)
+		return ret;
+
+	if (value >= 0)
+		batt_drv->aacp_version = value;
+
+	return count;
+}
+
+static ssize_t aacp_version_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct power_supply *psy = container_of(dev, struct power_supply, dev);
+	struct batt_drv *batt_drv = power_supply_get_drvdata(psy);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", batt_drv->aacp_version);
+}
+
+static const DEVICE_ATTR_RW(aacp_version);
+
+/* AACC ------------------------------------------------------------------- */
+
+static ssize_t aacc_show(struct device *dev,
+			 struct device_attribute *attr, char *buf)
+{
+	struct power_supply *psy = container_of(dev, struct power_supply, dev);
+	struct batt_drv *batt_drv = power_supply_get_drvdata(psy);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", batt_drv->aacc);
+}
+
+static const DEVICE_ATTR_RO(aacc);
+
 /* Swelling  --------------------------------------------------------------- */
 
 static ssize_t swelling_data_show(struct device *dev,
@@ -9522,6 +9585,14 @@ static int batt_init_fs(struct batt_drv *batt_drv)
 	ret = device_create_file(&batt_drv->psy->dev, &dev_attr_aact_state);
 	if (ret)
 		dev_err(&batt_drv->psy->dev, "Failed to create aact state\n");
+	/* aacp */
+	ret = device_create_file(&batt_drv->psy->dev, &dev_attr_aacp_version);
+	if (ret)
+		dev_err(&batt_drv->psy->dev, "Failed to create aacp version\n");
+	/* aacc */
+	ret = device_create_file(&batt_drv->psy->dev, &dev_attr_aacc);
+	if (ret)
+		dev_err(&batt_drv->psy->dev, "Failed to create aacc\n");
 
 	/* health and health index */
 	ret = device_create_file(&batt_drv->psy->dev, &dev_attr_swelling_data);
