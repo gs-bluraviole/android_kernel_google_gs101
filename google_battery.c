@@ -1977,6 +1977,10 @@ static void batt_chg_stats_update(struct batt_drv *batt_drv, int temp_idx,
 	ce_data->csi_aggregate_status = batt_drv->csi_stats.aggregate_status;
 	ce_data->csi_aggregate_type = batt_drv->csi_stats.aggregate_type;
 
+	/* Log aacp_version and aacc into chg_stats */
+	ce_data->aacp_version = batt_drv->aacp_version;
+	ce_data->aacc = batt_drv->aacc;
+
 	/* Note: To log new voltage tiers, add to list in go/pixel-vtier-defs */
 	/* ---  Log tiers in PARALLEL below ---  */
 
@@ -2380,7 +2384,7 @@ static int batt_chg_stats_cstr(char *buff, int size,
 				ce_data->adapter_details.ad_voltage * 100,
 				ce_data->adapter_details.ad_amperage * 100);
 
-	len += scnprintf(&buff[len], size - len, "%s%hu,%hu, %hu,%hu %d %hu,%hu",
+	len += scnprintf(&buff[len], size - len, "%s%hu,%hu, %hu,%hu %d %hu,%hu, %d,%d",
 				(verbose) ?  "\nS: " : ", ",
 				ce_data->charging_stats.ssoc_in,
 				ce_data->charging_stats.voltage_in,
@@ -2388,7 +2392,9 @@ static int batt_chg_stats_cstr(char *buff, int size,
 				ce_data->charging_stats.voltage_out,
 				state_capacity,
 				ce_data->csi_aggregate_status,
-				ce_data->csi_aggregate_type);
+				ce_data->csi_aggregate_type,
+				ce_data->aacp_version,
+				ce_data->aacc);
 
 
 	if (verbose) {
@@ -12213,6 +12219,9 @@ static int google_battery_probe(struct platform_device *pdev)
 
 	/* AACT server side */
 	batt_drv->aact_state = BATT_AACT_DISABLED;
+
+	/* AACP default version */
+	batt_drv->aacp_version = 1;
 
 	/* create the sysfs node */
 	batt_init_fs(batt_drv);

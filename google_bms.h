@@ -409,6 +409,9 @@ struct gbms_charging_event {
 	uint16_t csi_aggregate_status;
 	uint16_t csi_aggregate_type;
 
+	int aacp_version;
+	int aacc;
+
 	/* health based charging */
 	struct batt_chg_health		ce_health;	/* updated on close */
 	struct gbms_ce_tier_stats	health_stats;	/* updated in HC */
