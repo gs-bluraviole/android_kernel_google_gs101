@@ -3,6 +3,7 @@
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load(
     "//build/kernel/kleaf:kernel.bzl",
+    "dtb_image",
     "kernel_abi",
     "kernel_build",
     "kernel_build_config",
@@ -71,10 +72,7 @@ kernel_build(
     srcs = [":kernel_sources"],
     outs = [
         ".config",
-    ] + [
-        "gs101/{}".format(dtb)
-        for dtb in GS101_DTBS
-    ],
+    ] + RAVIOLE_DTBOS + GS101_DTBS,
     base_kernel = "//common:kernel_aarch64",
     build_config = ":build_config",
     collect_unstripped_modules = True,
@@ -90,19 +88,15 @@ kernel_build(
     strip_modules = True,
 )
 
-kernel_build(
-    name = "_dtbos",
-    srcs = [":kernel_sources"],
-    outs = RAVIOLE_DTBOS,
-    base_kernel = "//common:kernel_aarch64",
-    build_config = ":build_config",
-    dtstree = ":dtstree",
-    make_goals = ["dtbs"],
+dtb_image(
+    name = "dtb_image",
+    srcs = [":kernel/" + dtb for dtb in GS101_DTBS],
+    out = "dtb.img",
 )
 
 filegroup(
     name = "dtbos",
-    srcs = ["_dtbos/" + dtbo for dtbo in RAVIOLE_DTBOS],
+    srcs = [":kernel/" + dtbo for dtbo in RAVIOLE_DTBOS],
     visibility = ["//private/devices/google/gs101:__subpackages__"],
 )
 
@@ -213,7 +207,7 @@ copy_to_dist_dir(
     name = "dist",
     data = [
         # keep sorted
-        ":dtbos",
+        ":dtb_image",
         ":insmod_cfgs",
         ":kernel",
         ":kernel_images",
