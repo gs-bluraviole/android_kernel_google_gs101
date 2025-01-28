@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2018-2024 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2018-2025 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -265,6 +265,7 @@ static bool release_queue(struct kbase_queue *queue);
 void kbase_csf_free_command_stream_user_pages(struct kbase_context *kctx, struct kbase_queue *queue)
 {
 	kernel_unmap_user_io_pages(kctx, queue);
+	queue->user_io_addr = NULL;
 
 	kbase_mem_pool_free_pages(&kctx->mem_pools.small[KBASE_MEM_GROUP_CSF_IO],
 				  KBASEP_NUM_CS_USER_IO_PAGES, queue->phys, true, false);
@@ -720,6 +721,12 @@ int kbase_csf_queue_bind(struct kbase_context *kctx, union kbase_ioctl_cs_queue_
 
 	if (bind->in.csi_index >= max_streams)
 		goto out;
+
+	if (queue->user_io_addr != NULL) {
+		dev_err(kctx->kbdev->dev, "Queue with stale user_io address: %pK",
+			(void *)queue->user_io_addr);
+		goto out;
+	}
 
 	if (group->run_state == KBASE_CSF_GROUP_TERMINATED)
 		goto out;
