@@ -873,6 +873,18 @@ wl_escan_handler(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 		WL_ERR(("Invalid escan result (NULL data)\n"));
 		goto exit;
 	}
+
+	/* escan_result and bss_info structure versions needs to be updated
+	 * according to the firmware used
+	 */
+	if ((status == WLC_E_STATUS_PARTIAL || status == WLC_E_STATUS_RXBCN) &&
+		(ntoh32(e->datalen) < (WL_ESCAN_RESULTS_V109_FIXED_SIZE +
+		sizeof(wl_bss_info_v109_t)))) {
+		WL_ERR(("Invalid partial scan result event data length %d\n",
+			ntoh32(e->datalen)));
+		goto exit;
+	}
+
 #ifdef WL_BCNRECV
 	if (status == WLC_E_STATUS_RXBCN) {
 		if (cfg->bcnrecv_info.bcnrecv_state == BEACON_RECV_STARTED) {
@@ -1270,10 +1282,12 @@ exit:
 }
 
 #ifdef WL_SCHED_SCAN
-s32 wl_cfgscan_pfn_handler(struct bcm_cfg80211 *cfg, wl_pfn_scanresult_v3_1_t *pfn_scanresult)
+s32 wl_cfgscan_pfn_handler(struct bcm_cfg80211 *cfg, wl_pfn_scanresult_v3_1_t *pfn_scanresult,
+	u32 total_event_len)
 {
 	s32 err = BCME_OK;
 	wl_bss_info_v109_t *bi = NULL;
+	u32 bss_info_len = 0;
 
 	bi = (wl_bss_info_v109_t *)pfn_scanresult->bss_info;
 	if (!bi) {
@@ -1281,6 +1295,15 @@ s32 wl_cfgscan_pfn_handler(struct bcm_cfg80211 *cfg, wl_pfn_scanresult_v3_1_t *p
 			"or invalid bss_info length\n"));
 		goto exit;
 	}
+
+	/* Each of the ie_length or ie_offset can have higher limit u32 value */
+	bss_info_len = total_event_len - sizeof(wl_pfn_scanresult_v3_1_t);
+	if ((bss_info_len < bi->ie_length) || ((bss_info_len - bi->ie_length) < bi->ie_offset)) {
+		WL_ERR(("Invalid pfn scan result event data length %d ie_offset %d ie_length %d\n",
+			total_event_len, bi->ie_offset, bi->ie_length));
+		return -EINVAL;
+	}
+
 	preempt_disable();
 #ifdef ESCAN_CHANNEL_CACHE
 	add_roam_cache(cfg, bi);
@@ -1301,9 +1324,19 @@ wl_cfgscan_pfn_scanresult_handler(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *c
 {
 	s32 err = BCME_OK;
 	wl_pfn_scanresult_v3_1_t *pfn_scanresult;
+	u32 total_event_len = ntoh32(e->datalen);
 
 	WL_DBG_MEM(("event type : %d, status : %d \n",
 		ntoh32(e->event_type), ntoh32(e->status)));
+	/* pfn_scanresult and bss_info structure versions needs to be updated
+	 * according to the firmware used
+	 */
+	if (total_event_len < (sizeof(wl_pfn_scanresult_v3_1_t) +
+		sizeof(wl_bss_info_v109_t))) {
+		WL_ERR(("Invalid pfn scan result event data length %d\n",
+			total_event_len));
+		return -EINVAL;
+	}
 
 	mutex_lock(&cfg->scan_sync);
 
@@ -1314,7 +1347,7 @@ wl_cfgscan_pfn_scanresult_handler(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *c
 	}
 
 	if (cfg->sched_scan_req) {
-		err = wl_cfgscan_pfn_handler(cfg, pfn_scanresult);
+		err = wl_cfgscan_pfn_handler(cfg, pfn_scanresult, total_event_len);
 	}
 exit:
 	mutex_unlock(&cfg->scan_sync);
