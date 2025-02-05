@@ -2165,7 +2165,7 @@ uclamp_tg_restrict_pixel_mod(struct task_struct *p, enum uclamp_id clamp_id)
 
 	/* Boost tasks during suspend/resume */
 	if (clamp_id == UCLAMP_MIN && cpuhp_tasks_frozen)
-		value = max(value, SCHED_CAPACITY_SCALE/2);
+		value = max(value, SCHED_CAPACITY_SCALE/4);
 
 	// For uclamp min, if task has a valid per-task setting that is lower than or equal to its
 	// group value, increase the final uclamp value by 1. This would have effect only on
