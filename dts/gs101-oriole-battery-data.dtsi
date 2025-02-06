@@ -49,6 +49,14 @@ maxim,config {
 			/* 0x0029 */	0xc623	/* FilterCFG */
 			/* 0x003c */	0x2D00	/* TaskPeriod */
 		>;
+		maxim,fg-aafv = /bits/ 32 <
+			200     0   95  0xff
+			400    20   90  0xff
+			600    40   85  0xff
+			800    60   80  0xff
+			1000   80   75  0xff
+			2000  100   70  0xff
+		>;
 	};
 
 	/* COS: 2_Coslight_5mOhm_RC2_model_revB.txt, b/205852816, rc2 model */
@@ -92,6 +100,14 @@ maxim,config {
 			/* 0x0029 */	0xc623	/* FilterCFG */
 			/* 0x003c */	0x2D00	/* TaskPeriod */
 		>;
+		maxim,fg-aafv = /bits/ 32 <
+			200     0   95  0xff
+			400    20   90  0xff
+			600    40   85  0xff
+			800    60   80  0xff
+			1000   80   75  0xff
+			2000  100   70  0xff
+		>;
 	};
 
 	/* LSN: 3_Lishen_5mOhm_RC2_model_revB.txt, 2021-08-23, b/205852816, rc2 model */
@@ -134,6 +150,14 @@ maxim,config {
 			/* 0x0049 */	0x2241	/* convgcfg */
 			/* 0x0029 */	0xc623	/* FilterCFG */
 			/* 0x003c */	0x2D00	/* TaskPeriod */
+		>;
+		maxim,fg-aafv = /bits/ 32 <
+			200     0   95  0xff
+			400    20   90  0xff
+			600    40   85  0xff
+			800    60   80  0xff
+			1000   80   75  0xff
+			2000  100   70  0xff
 		>;
 	};
 
