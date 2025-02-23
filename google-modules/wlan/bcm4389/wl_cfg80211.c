@@ -6867,7 +6867,7 @@ wl_sync_fw_assoc_states(struct bcm_cfg80211 *cfg,
 void
 wl_pkt_mon_start(struct bcm_cfg80211 *cfg, struct net_device *dev)
 {
-	if ((dev == bcmcfg_to_prmry_ndev(cfg))) {
+	if (dev == bcmcfg_to_prmry_ndev(cfg)) {
 		dhd_pub_t *dhdp =  (dhd_pub_t *)(cfg->pub);
 		DHD_DBG_PKT_MON_START(dhdp);
 	}
