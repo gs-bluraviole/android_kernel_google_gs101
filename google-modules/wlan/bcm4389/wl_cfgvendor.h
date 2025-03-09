@@ -607,7 +607,7 @@ typedef struct dhd_buf_ring_map_entry {
 	char ring_name[DBGRING_NAME_MAX];
 } dhd_buf_ring_map_entry_t;
 
-static dhd_buf_ring_map_entry_t dhd_buf_ring_map[] = {
+static dhd_buf_ring_map_entry_t dhd_buf_ring_map[] __attribute__((unused)) = {
 	{DUMP_BUF_ATTR_TIMESTAMP, DEBUG_DUMP_RING1_ID, DEBUG_DUMP_RING1_NAME},
 	{DUMP_BUF_ATTR_ECNTRS, DEBUG_DUMP_RING2_ID, DEBUG_DUMP_RING2_NAME},
 	{DUMP_BUF_ATTR_STATUS_LOG, DEBUG_DUMP_RING1_ID, DEBUG_DUMP_RING1_NAME},

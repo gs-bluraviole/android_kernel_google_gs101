@@ -15,7 +15,7 @@
 
 #include "mfc_common.h"
 
-static int mfc_colorspace_to_rgb_format_ctrl[][2] = {
+static int mfc_colorspace_to_rgb_format_ctrl[][2] __maybe_unused = {
 	{ MFC_COLORSPACE_UNSPECIFICED,	1}, /* Unknown */
 	{ MFC_COLORSPACE_BT601,		0}, /* Rec. ITU-R BT.601-7 */
 	{ MFC_COLORSPACE_BT709,		1}, /* Rec. ITU-R BT.709-6 */
@@ -29,7 +29,7 @@ static int mfc_colorspace_to_rgb_format_ctrl[][2] = {
 	{ MFC_COLORSPACE_UNSPECIFICED,	1}, /* Unknown */
 };
 
-static int mfc_transfer_to_rgb_format_ctrl[][2] = {
+static int mfc_transfer_to_rgb_format_ctrl[][2] __maybe_unused = {
 	{ MFC_TRANSFER_RESERVED,	1},
 	{ MFC_TRANSFER_BT709,		1},
 	{ MFC_TRANSFER_UNSPECIFIED,	1},

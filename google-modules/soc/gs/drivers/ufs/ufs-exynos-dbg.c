@@ -493,7 +493,7 @@ static void __ufs_put_cmd_log(struct ufs_dbg_mgr *mgr,
 	spin_lock_irqsave(&mgr->cmd_lock, flags);
 	pdata = &cmd_info->data[cmd_info->last];
 	++cmd_info->total;
-	cmd_info->last = (++cmd_info->last) % MAX_CMD_LOGS;
+	cmd_info->last = (cmd_info->last + 1) % MAX_CMD_LOGS;
 	spin_unlock_irqrestore(&mgr->cmd_lock, flags);
 
 	pdata->op = cmd_data->op;

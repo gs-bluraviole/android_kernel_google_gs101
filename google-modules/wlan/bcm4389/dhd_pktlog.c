@@ -1039,20 +1039,20 @@ dhd_pktlog_filter_matched(dhd_pktlog_filter_t *filter, char *data, uint32 pktlog
 	}
 
 	for (i = 0; i < filter->list_cnt; i++) {
-		if (&filter->info[i] && filter->info[i].id && filter->info[i].enable) {
-			szbts = filter->info[i].size_bytes;
-			offset = filter->info[i].offset;
-			mask = &filter->info[i].mask[0];
-			pkt_offset = &data[offset];
-			pattern = &filter->info[i].pattern[0];
+		if (filter->info[i].id && filter->info[i].enable) {
+        szbts = filter->info[i].size_bytes;
+        offset = filter->info[i].offset;
+        mask = &filter->info[i].mask[0];
+        pkt_offset = &data[offset];
+        pattern = &filter->info[i].pattern[0];
 
-			matched = TRUE;
-			for (j = 0; j < szbts; j++) {
-				if ((mask[j] & pkt_offset[j]) != pattern[j]) {
-					matched = FALSE;
-					break;
-				}
-			}
+        matched = TRUE;
+        for (j = 0; j < szbts; j++) {
+            if ((mask[j] & pkt_offset[j]) != pattern[j]) {
+                matched = FALSE;
+                break;
+    }
+}
 
 			if (matched) {
 				DHD_PKT_LOG(("%s(): pktlog_filter return TRUE id %d\n",
@@ -1451,12 +1451,12 @@ dhd_pktlog_dump_write(dhd_pub_t *dhdp, void *file, const void *user_buf, uint32 
 		}
 
 		bytes_user_data = snprintf(buf, sizeof(buf), "%s:%s:%02d\n",
-				DHD_PKTLOG_FATE_INFO_FORMAT,
-				(report_ptr->tx_fate ? "Failure" : "Succeed"),
-				(report_ptr->tx_fate & !(TX_PKT_FATE_DRV_WAIT_UPDATE)));
-		write_frame_len = frame_len + bytes_user_data;
-		frame_len = (uint32)min(frame_len, DHD_PKT_LOGGING_DBGRING_MAX_SIZE);
-		captured_frame_len = frame_len + bytes_user_data;
+		DHD_PKTLOG_FATE_INFO_FORMAT,
+		(report_ptr->tx_fate ? "Failure" : "Succeed"),
+		(report_ptr->tx_fate & TX_PKT_FATE_DRV_WAIT_UPDATE ? 1 : 0));
+write_frame_len = frame_len + bytes_user_data;
+frame_len = (uint32)min(frame_len, DHD_PKT_LOGGING_DBGRING_MAX_SIZE);
+captured_frame_len = frame_len + bytes_user_data;
 
 		/* pcap pkt head has incl_len and orig_len */
 		ret = memcpy_s((void*)(user_buf + len), size - len,
