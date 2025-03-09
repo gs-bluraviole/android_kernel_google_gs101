@@ -5249,9 +5249,8 @@ static int pca9468_probe(struct i2c_client *client,
 		disable_irq(client->irq);
 	}
 
-	ret = pca9468_create_fs_entries(pca9468_chg);
-	if (ret < 0)
-		dev_err(dev, "error while registering debugfs %d\n", ret);
+	if (pca9468_create_fs_entries(pca9468_chg))
+		dev_err(dev, "error while registering debugfs\n");
 
 #ifdef CONFIG_THERMAL
 	if (pdata->usb_tz_name) {
