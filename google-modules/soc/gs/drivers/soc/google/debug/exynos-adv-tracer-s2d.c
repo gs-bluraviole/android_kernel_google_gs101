@@ -39,7 +39,7 @@ struct plugin_s2d_info {
 	unsigned int burnin_ctrl;
 	int sel_scanmode;
 	int dbgsel_sw;
-	bool arraydump_done;
+	uint32_t arraydump_done;
 	int blk_count;
 	const char **blk_names;
 };
