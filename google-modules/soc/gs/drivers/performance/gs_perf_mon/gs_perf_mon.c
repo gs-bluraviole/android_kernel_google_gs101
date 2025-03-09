@@ -823,37 +823,26 @@ int gs_perf_mon_driver_probe(struct platform_device *pdev)
 	ret = register_trace_android_vh_cpu_idle_enter(vendor_update_event_cpu_idle_enter, NULL);
 	if (ret) {
 		dev_err(dev, "Register idle enter vendor hook fail %d\n", ret);
-		goto err_vh_idle_enter_register;
 	}
 	ret = register_trace_android_vh_cpu_idle_exit(vendor_update_event_cpu_idle_exit, NULL);
 	if (ret) {
 		dev_err(dev, "Register idle exit vendor hook fail %d\n", ret);
-		goto err_vh_idle_exit_register;
 	}
 
 	/* Register cpu hotplugs. */
 	ret = gs_init_perf_mon_cpuhp();
 	if (ret < 0) {
 		dev_err(dev, "gs_init_perf_mon_cpuhp errored with number %d\n", ret);
-		goto err_cpuhp_init;
 	}
 
 	/* Start the perf monitor. */
 	ret = gs_perf_mon_start();
 	if (ret) {
 		dev_err(dev, "gs_perf_mon could not stop with error code %d\n", ret);
-		goto err_cpuhp_init;
 	}
 	perf_mon_metadata.perf_monitor_initialized = true;
 	return 0;
-
-/* If any of the above steps failed, we need to free resources and unregister hooks. */
-err_cpuhp_init:
-	unregister_trace_android_vh_cpu_idle_exit(vendor_update_event_cpu_idle_exit, NULL);
-err_vh_idle_exit_register:
-	unregister_trace_android_vh_cpu_idle_enter(vendor_update_event_cpu_idle_enter, NULL);
-err_vh_idle_enter_register:
-err_client_data:
+	err_client_data:
 	kthread_stop(perf_mon_metadata.perf_mon_task);
 	return ret;
 }
