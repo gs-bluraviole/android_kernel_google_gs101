@@ -577,8 +577,11 @@ static int mct_init_dt(struct device_node *np, unsigned int int_type)
 	u32 nr_irqs = 0, i;
 	struct of_phandle_args irq;
 	int ret;
-
+	
 	mct_int_type = int_type;
+	
+	if (of_clk_get_by_name(np, "fin_pll") == ERR_PTR(-EPROBE_DEFER))
+		return -EPROBE_DEFER;
 
 	/* This driver uses only one global timer interrupt */
 	mct_irqs[MCT_G0_IRQ] = irq_of_parse_and_map(np, MCT_G0_IRQ);
