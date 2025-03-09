@@ -3225,12 +3225,13 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 					sec_ts_locked_release_all_finger(ts);
 					ret = sec_ts_write(ts,
 						SEC_TS_CMD_SENSE_ON, NULL, 0);
-					if (ret < 0)
+					if (ret < 0) {
 						input_err(true,
 							&ts->client->dev,
 							"%s: fail to write Sense_on\n",
 							__func__);
 						sec_ts_reinit(ts);
+					}
 					break;
 				case 0x40:
 					input_info(true, &ts->client->dev,

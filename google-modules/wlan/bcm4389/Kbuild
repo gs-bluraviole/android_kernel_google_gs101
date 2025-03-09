@@ -28,9 +28,6 @@ ifeq ($(KERNEL_SRC),)
  else
   BCMDHD_ROOT=$(srctree)/$(src)
  endif
- $(warning : ** Regular in-tree build BCMDHD_ROOT=$(BCMDHD_ROOT)**)
-else
- $(warning : ** out-of-tree Kbuild BCMDHD_ROOT=$(BCMDHD_ROOT)**)
 endif
 
 # For pixel build, unset SOC related configs which are defined in DHD
