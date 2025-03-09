@@ -30,6 +30,10 @@ config DRM_PANEL_SAMSUNG_SOFEF01
 config DRM_PANEL_SAMSUNG_S6E3HC3
 	tristate "Samsung S6E3HC3 Panel"
 	depends on DRM && DRM_PANEL
+	
+config DRM_PANEL_SAMSUNG_S6E3FC3_6A
+	tristate "Samsung S6E3HC3_6A Panel"
+	depends on DRM && DRM_PANEL
 
 config DRM_PANEL_SAMSUNG_S6E3HC3_C10
 	tristate "Samsung S6E3HC3_C10 Panel"
