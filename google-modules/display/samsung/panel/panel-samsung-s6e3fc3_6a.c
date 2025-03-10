@@ -10,7 +10,9 @@
  */
 
 #include <drm/drm_vblank.h>
+#ifdef CONFIG_DEBUG_FS 
 #include <linux/debugfs.h>
+#endif
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <video/mipi_display.h>
@@ -414,6 +416,7 @@ static bool s6e3fc3_6a_is_mode_seamless(const struct exynos_panel *ctx,
 	return drm_mode_equal_no_clocks(&ctx->current_mode->mode, &pmode->mode);
 }
 
+#ifdef CONFIG_DEBUG_FS
 static void s6e3fc3_6a_debugfs_init(struct drm_panel *panel, struct dentry *root)
 {
 	struct exynos_panel *ctx = container_of(panel, struct exynos_panel, panel);
@@ -426,6 +429,7 @@ static void s6e3fc3_6a_debugfs_init(struct drm_panel *panel, struct dentry *root
 					   &s6e3fc3_6a_init_cmd_set, "init");
 	dput(csroot);
 }
+#endif
 
 static void s6e3fc3_6a_panel_init(struct exynos_panel *ctx)
 {
@@ -559,7 +563,9 @@ static const struct drm_panel_funcs s6e3fc3_6a_drm_funcs = {
 	.prepare = exynos_panel_prepare,
 	.enable = s6e3fc3_6a_enable,
 	.get_modes = exynos_panel_get_modes,
+#ifdef CONFIG_DEBUG_FS
 	.debugfs_init = s6e3fc3_6a_debugfs_init,
+#endif
 };
 
 static const struct exynos_panel_funcs s6e3fc3_6a_exynos_funcs = {

@@ -1323,6 +1323,7 @@ static const struct exynos_panel_mode s6e3hc3_lp_modes[] = {
 	},
 };
 
+#ifdef CONFIG_DEBUG_FS
 static void s6e3hc3_panel_mode_create_cmdset(struct exynos_panel *ctx,
 					     struct dentry *parent,
 					     const struct exynos_panel_mode *pmode)
@@ -1381,6 +1382,7 @@ static void s6e3hc3_debugfs_init(struct drm_panel *panel, struct dentry *root)
 	dput(csroot);
 	dput(panel_root);
 }
+#endif
 
 static void s6e3hc3_panel_init(struct exynos_panel *ctx)
 {
@@ -1406,7 +1408,9 @@ static const struct drm_panel_funcs s6e3hc3_drm_funcs = {
 	.prepare = exynos_panel_prepare,
 	.enable = s6e3hc3_enable,
 	.get_modes = exynos_panel_get_modes,
+#ifdef CONFIG_DEBUG_FS
 	.debugfs_init = s6e3hc3_debugfs_init,
+#endif
 };
 
 static const struct exynos_panel_funcs s6e3hc3_exynos_funcs = {
