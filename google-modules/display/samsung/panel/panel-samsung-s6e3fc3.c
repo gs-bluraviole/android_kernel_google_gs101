@@ -10,7 +10,9 @@
  */
 
 #include <drm/drm_vblank.h>
+#ifdef CONFIG_DEBUG_FS 
 #include <linux/debugfs.h>
+#endif
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <video/mipi_display.h>
@@ -435,6 +437,7 @@ static void send_10_bit_global_para(struct exynos_panel *ctx)
 	EXYNOS_DCS_WRITE_TABLE(ctx, test_key_off_f0);
 }
 
+#ifdef CONFIG_DEBUG_FS
 static void s6e3fc3_debugfs_init(struct drm_panel *panel, struct dentry *root)
 {
 	struct exynos_panel *ctx = container_of(panel, struct exynos_panel, panel);
@@ -447,6 +450,7 @@ static void s6e3fc3_debugfs_init(struct drm_panel *panel, struct dentry *root)
 					   &s6e3fc3_init_cmd_set, "init");
 	dput(csroot);
 }
+#endif
 
 static void s6e3fc3_panel_init(struct exynos_panel *ctx)
 {
@@ -629,7 +633,9 @@ static const struct drm_panel_funcs s6e3fc3_drm_funcs = {
 	.prepare = exynos_panel_prepare,
 	.enable = s6e3fc3_enable,
 	.get_modes = exynos_panel_get_modes,
+#ifdef CONFIG_DEBUG_FS
 	.debugfs_init = s6e3fc3_debugfs_init,
+#endif
 };
 
 static const struct exynos_panel_funcs s6e3fc3_exynos_funcs = {
