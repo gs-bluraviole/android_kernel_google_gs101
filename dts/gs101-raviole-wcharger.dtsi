@@ -29,6 +29,7 @@
 		/* Defender */
 		google,power_mitigate_threshold = <90>;
 		google,has-sw-ramp;
+		google,wcin_inlim_en = <&max77759_gpio 0 GPIO_ACTIVE_HIGH>;
 
 		/* TXID: Phone type */
 		idt,tx_id_phone_type = /bits/ 8 <2>;
