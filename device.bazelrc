@@ -17,7 +17,7 @@ build:use_source_tree_aosp_staging --kernel_package=@//aosp-staging
 
 build:download_gki --use_prebuilt_gki
 build:download_gki --use_signed_prebuilts
-build:download_gki --action_env=KLEAF_DOWNLOAD_BUILD_NUMBER_MAP="gki_prebuilts=12440485"
+build:download_gki --action_env=KLEAF_DOWNLOAD_BUILD_NUMBER_MAP="gki_prebuilts=12946699"
 build:no_download_gki --use_prebuilt_gki=false
 
 build:download_gki_fips140 --//private/devices/google/common:download_prebuilt_gki_fips140=1
@@ -43,6 +43,9 @@ build:kunit --notrim --//private/devices/google/common:kunit
 
 # For compatibility, Recommand to use --config=testing or --config=kunit.
 build:pixel_kunit --config=kunit
+
+# Build 16k page size kernel
+build:16k --page_size=16k --config=no_download_gki --config=no_download_gki_fips140
 
 # Placeholders for soc specific bazelrc files. Add as many as you need.
 try-import %workspace%/.c1.bazelrc
