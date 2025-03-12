@@ -748,10 +748,10 @@ static int google_bcl_register_zone(struct bcl_device *bcl_dev, int idx, const c
 	INIT_WORK(&zone->irq_triggered_work, google_irq_triggered_work);
 	INIT_DELAYED_WORK(&zone->warn_work, google_warn_work);
 	if (idx == SMPL_WARN) {
-		latched_intr_flag = IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING;
+		latched_intr_flag = IRQF_TRIGGER_FALLING;
 		zone->polarity = 0;
 	} else {
-		latched_intr_flag = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
+		latched_intr_flag = IRQF_TRIGGER_RISING;
 		zone->polarity = 1;
 	}
 	latched_intr_flag = latched_intr_flag | default_intr_flag;
@@ -944,7 +944,6 @@ static void google_bcl_setup_main_odpm(struct work_struct *work) {
 	int read;
 	struct device_node *child;
 	struct device_node *p_np;
-	struct device_node *np;
 #elif IS_ENABLED(CONFIG_REGULATOR_S2MPG12)
 	struct s2mpg12_platform_data *pdata;
 #elif IS_ENABLED(CONFIG_REGULATOR_S2MPG10)
@@ -975,9 +974,8 @@ static void google_bcl_setup_main_odpm(struct work_struct *work) {
 		bcl_dev->main_rail_names[i] = bcl_dev->main_odpm->chip.rails[rail_i].schematic_name;
 	}
 #if IS_ENABLED(CONFIG_REGULATOR_S2MPG14)
-	np = bcl_dev->device->of_node;
 	/* parse ODPM main limit */
-	p_np = of_get_child_by_name(np, "main_limit");
+	p_np = of_get_child_by_name(bcl_dev->device->of_node, "main_limit");
 	if (p_np) {
 		i = 0;
 		for_each_child_of_node(p_np, child) {
@@ -1004,7 +1002,6 @@ static void google_bcl_setup_sub_odpm(struct work_struct *work) {
 	int read;
 	struct device_node *child;
 	struct device_node *p_np;
-	struct device_node *np;
 #elif IS_ENABLED(CONFIG_REGULATOR_S2MPG12)
 	struct s2mpg13_platform_data *pdata;
 #elif IS_ENABLED(CONFIG_REGULATOR_S2MPG10)
@@ -1036,7 +1033,7 @@ static void google_bcl_setup_sub_odpm(struct work_struct *work) {
 	}
 #if IS_ENABLED(CONFIG_REGULATOR_S2MPG14)
 	/* parse ODPM sub limit */
-	p_np = of_get_child_by_name(np, "sub_limit");
+	p_np = of_get_child_by_name(bcl_dev->device->of_node, "sub_limit");
 	if (p_np) {
 		i = 0;
 		for_each_child_of_node(p_np, child) {
@@ -2157,6 +2154,7 @@ static void google_bcl_parse_dtree(struct bcl_device *bcl_dev)
 		dev_err(bcl_dev->device, "Cannot parse device tree\n");
 		return;
 	}
+	np = bcl_dev->device->of_node;
 
 	/* parse ODPM main mitigation module */
 	p_np = of_get_child_by_name(np, "main_mitigation");
