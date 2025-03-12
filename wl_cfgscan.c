@@ -873,6 +873,18 @@ wl_escan_handler(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 		WL_ERR(("Invalid escan result (NULL data)\n"));
 		goto exit;
 	}
+
+	/* escan_result and bss_info structure versions needs to be updated
+	 * according to the firmware used
+	 */
+	if ((status == WLC_E_STATUS_PARTIAL || status == WLC_E_STATUS_RXBCN) &&
+		(ntoh32(e->datalen) < (WL_ESCAN_RESULTS_V109_FIXED_SIZE +
+		sizeof(wl_bss_info_v109_t)))) {
+		WL_ERR(("Invalid partial scan result event data length %d\n",
+			ntoh32(e->datalen)));
+		goto exit;
+	}
+
 #ifdef WL_BCNRECV
 	if (status == WLC_E_STATUS_RXBCN) {
 		if (cfg->bcnrecv_info.bcnrecv_state == BEACON_RECV_STARTED) {
@@ -1270,10 +1282,12 @@ exit:
 }
 
 #ifdef WL_SCHED_SCAN
-s32 wl_cfgscan_pfn_handler(struct bcm_cfg80211 *cfg, wl_pfn_scanresult_v3_1_t *pfn_scanresult)
+s32 wl_cfgscan_pfn_handler(struct bcm_cfg80211 *cfg, wl_pfn_scanresult_v3_1_t *pfn_scanresult,
+	u32 total_event_len)
 {
 	s32 err = BCME_OK;
 	wl_bss_info_v109_t *bi = NULL;
+	u32 bss_info_len = 0;
 
 	bi = (wl_bss_info_v109_t *)pfn_scanresult->bss_info;
 	if (!bi) {
@@ -1281,6 +1295,15 @@ s32 wl_cfgscan_pfn_handler(struct bcm_cfg80211 *cfg, wl_pfn_scanresult_v3_1_t *p
 			"or invalid bss_info length\n"));
 		goto exit;
 	}
+
+	/* Each of the ie_length or ie_offset can have higher limit u32 value */
+	bss_info_len = total_event_len - sizeof(wl_pfn_scanresult_v3_1_t);
+	if ((bss_info_len < bi->ie_length) || ((bss_info_len - bi->ie_length) < bi->ie_offset)) {
+		WL_ERR(("Invalid pfn scan result event data length %d ie_offset %d ie_length %d\n",
+			total_event_len, bi->ie_offset, bi->ie_length));
+		return -EINVAL;
+	}
+
 	preempt_disable();
 #ifdef ESCAN_CHANNEL_CACHE
 	add_roam_cache(cfg, bi);
@@ -1301,9 +1324,19 @@ wl_cfgscan_pfn_scanresult_handler(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *c
 {
 	s32 err = BCME_OK;
 	wl_pfn_scanresult_v3_1_t *pfn_scanresult;
+	u32 total_event_len = ntoh32(e->datalen);
 
 	WL_DBG_MEM(("event type : %d, status : %d \n",
 		ntoh32(e->event_type), ntoh32(e->status)));
+	/* pfn_scanresult and bss_info structure versions needs to be updated
+	 * according to the firmware used
+	 */
+	if (total_event_len < (sizeof(wl_pfn_scanresult_v3_1_t) +
+		sizeof(wl_bss_info_v109_t))) {
+		WL_ERR(("Invalid pfn scan result event data length %d\n",
+			total_event_len));
+		return -EINVAL;
+	}
 
 	mutex_lock(&cfg->scan_sync);
 
@@ -1314,7 +1347,7 @@ wl_cfgscan_pfn_scanresult_handler(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *c
 	}
 
 	if (cfg->sched_scan_req) {
-		err = wl_cfgscan_pfn_handler(cfg, pfn_scanresult);
+		err = wl_cfgscan_pfn_handler(cfg, pfn_scanresult, total_event_len);
 	}
 exit:
 	mutex_unlock(&cfg->scan_sync);
@@ -6992,6 +7025,7 @@ wl_acs_check_scc(struct bcm_cfg80211 *cfg, drv_acs_params_t *parameter,
 	chanspec_t sta_chanspec, int qty, uint32 *pList)
 {
 	bool scc = FALSE;
+	chanspec_t cur_chanspec = INVCHANSPEC;
 
 	if (!(parameter->freq_bands & CHSPEC_TO_WLC_BAND(sta_chanspec))) {
 		return scc;
@@ -7024,9 +7058,26 @@ wl_acs_check_scc(struct bcm_cfg80211 *cfg, drv_acs_params_t *parameter,
 #endif /* DHD_ACS_CHECK_SCC_2G_ACTIVE_CH */
 
 	if (scc == TRUE) {
-		parameter->scc_chspec = sta_chanspec;
-		parameter->freq_bands = CHSPEC_TO_WLC_BAND(sta_chanspec);
-		WL_INFORM_MEM(("SCC case, ACS pick up STA chanspec:0x%x\n", sta_chanspec));
+		cur_chanspec = sta_chanspec;
+
+		WL_INFORM_MEM(("sta connected case. chosen:0x%x\n", cur_chanspec));
+		if ((CHSPEC_BAND(cur_chanspec) == WL_CHANSPEC_BAND_5G) &&
+			((CHSPEC_BW(cur_chanspec) == WL_CHANSPEC_BW_320) ||
+			(CHSPEC_BW(cur_chanspec) == WL_CHANSPEC_BW_160))) {
+			/* max bw restricted to 80MHz */
+			if (wl_cfgscan_get_bw_chspec((chanspec_t *)&cur_chanspec,
+				WL_CHANSPEC_BW_80)) {
+				WL_ERR(("bw config failed for chosen chspec\n"));
+				cur_chanspec = INVCHANSPEC;
+				return FALSE;
+			}
+			WL_INFORM_MEM(("5G AP restricted to 80Mhz. chosen:0x%x\n",
+				cur_chanspec));
+		}
+
+		parameter->scc_chspec = cur_chanspec;
+		parameter->freq_bands = CHSPEC_TO_WLC_BAND(cur_chanspec);
+		WL_INFORM_MEM(("SCC case, ACS pick up STA chanspec:0x%x\n", cur_chanspec));
 	}
 	return scc;
 }
@@ -7155,4 +7206,45 @@ wl_handle_acs_concurrency_cases(struct bcm_cfg80211 *cfg, drv_acs_params_t *para
 		}
 	}
 	return BCME_OK;
+}
+
+s32
+wl_cfgscan_get_bw_chspec(chanspec_t *chspec, u32 bw)
+{
+	chanspec_t cur_chspec = *chspec;
+
+#ifdef WL_BW320MHZ
+	*chspec = wf_create_chspec_from_primary(wf_chspec_primary20_chan(cur_chspec),
+		bw, CHSPEC_BAND(cur_chspec), 0);
+#else
+	*chspec = wf_create_chspec_from_primary(wf_chspec_primary20_chan(cur_chspec),
+		bw, CHSPEC_BAND(cur_chspec));
+#endif /* WL_BW320MHZ */
+	if (!wf_chspec_valid(*chspec)) {
+		WL_ERR(("invalid chanspec\n"));
+		return BCME_ERROR;
+	}
+
+	WL_INFORM_MEM(("cur_chspec:%x new_chspec:0x%x BW:%d chan:%d\n",
+			cur_chspec, *chspec, bw,
+			wf_chspec_primary20_chan(*chspec)));
+	return BCME_OK;
+}
+
+void
+wl_connected_channel_debuggability(struct bcm_cfg80211 * cfg, struct net_device * ndev)
+{
+	chanspec_t *chanspec;
+	struct ieee80211_channel *chan;
+	u32 center_freq;
+	struct wiphy *wiphy = bcmcfg_to_wiphy(cfg);
+
+	chanspec = (chanspec_t *)wl_read_prof(cfg, ndev, WL_PROF_CHAN);
+	center_freq = wl_channel_to_frequency(wf_chspec_ctlchan(*chanspec),
+			CHSPEC_BAND(*chanspec));
+
+	chan = ieee80211_get_channel(wiphy, center_freq);
+	if (chan) {
+		WL_INFORM_MEM(("Connected center_freq:%d flags:%x\n", center_freq, chan->flags));
+	}
 }

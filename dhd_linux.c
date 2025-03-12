@@ -3453,7 +3453,7 @@ dhd_ndev_upd_features_handler(void *handle, void *event_info, u8 event)
 			DHD_PRINT(("%s: exit as dhd_stop in progress\n", __FUNCTION__));
 			return;
 		}
-		/* wait for 50msec and retry rtnl_lock */
+		/* wait for 20msec and retry rtnl_lock */
 		DHD_PRINT(("%s: rtnl_lock held mostly by dhd_open, wait\n", __FUNCTION__));
 		OSL_SLEEP(50);
 	}
@@ -4781,9 +4781,11 @@ dhd_rpm_state_thread(void *data)
 {
 	tsk_ctl_t *tsk = (tsk_ctl_t *)data;
 	dhd_info_t *dhd = (dhd_info_t *)tsk->parent;
+	int ret = 0;
 
 	while (1) {
-		if (down_interruptible (&tsk->sema) == 0) {
+		ret = down_interruptible (&tsk->sema);
+		if (ret == 0) {
 			unsigned long flags;
 			unsigned long jiffies_at_start = jiffies;
 			unsigned long time_lapse;
@@ -4827,10 +4829,14 @@ dhd_rpm_state_thread(void *data)
 				DHD_GENERAL_UNLOCK(&dhd->pub, flags);
 			}
 		} else {
+			DHD_PRINT(("RPM thread is signalled or timeout ret:%d\n", ret));
 			break;
 		}
 	}
 
+	DHD_PRINT(("%s: RPM thread complete and exit\n", __func__));
+	dhd->thr_rpm_ctl.thr_pid = DHD_PID_KT_TERMINATED;
+	dhd->thr_rpm_ctl.terminated = TRUE;
 	KTHREAD_COMPLETE_AND_EXIT(&tsk->completed, 0);
 }
 
@@ -14257,7 +14263,7 @@ void dhd_detach(dhd_pub_t *dhdp)
 
 			dhd_if_del_sta_list(ifp);
 
-			MFREE(dhd->pub.osh, ifp, sizeof(*ifp));
+			MFREE(dhd->pub.osh, dhd->iflist[0], sizeof(*ifp));
 			ifp = NULL;
 #ifdef WL_CFG80211
 			if (cfg && cfg->wdev) {
@@ -15414,6 +15420,15 @@ exit:
 
 }
 
+bool dhd_is_rpm_thread_alive(dhd_pub_t *pub)
+{
+	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
+	if (dhd->thr_rpm_ctl.thr_pid < 0) {
+		return FALSE;
+	} else {
+		return TRUE;
+	}
+}
 #endif /* DHD_PCIE_RUNTIMEPM */
 
 int

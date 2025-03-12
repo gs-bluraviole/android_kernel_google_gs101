@@ -1838,7 +1838,9 @@ wl_cellavoid_is_pwrcap_valid(struct bcm_cfg80211 *cfg,
 	int32 fwk_val, int8 *pwrcap)
 {
 	int ret = BCME_OK;
+
 	WL_DBG_MEM(("fwk_val:0x%x\n", fwk_val));
+
 	if (fwk_val == CELLAVOID_NO_POWER_CAP) {
 		*pwrcap = CELLAVOID_TXCAP_MAX_VAL;
 	} else if ((fwk_val < CELLAVOID_TXCAP_MAX_VAL) &&
@@ -1849,6 +1851,7 @@ wl_cellavoid_is_pwrcap_valid(struct bcm_cfg80211 *cfg,
 			fwk_val));
 		ret = BCME_BADARG;
 	}
+
 	return ret;
 }
 

@@ -33,6 +33,14 @@ else
  $(warning : ** out-of-tree Kbuild BCMDHD_ROOT=$(BCMDHD_ROOT)**)
 endif
 
+# For pixel build, unset SOC related configs which are defined in DHD
+ifneq ($(CONFIG_SOC_GOOGLE),)
+  # Find configs in DHD code with prefix "CONFIG_ARCH_"
+  ARCH_CONFIGS := $(shell grep -rEoh "CONFIG_ARCH_([0-9]|[A-Z]|_)+" $(BCMDHD_ROOT)/* | sort | uniq)
+  # Unset these CONFIG_ARCH_* configs if it is defined in kernel layer
+  $(foreach var, $(ARCH_CONFIGS), $(eval $(var) :=))
+endif
+
 #####################
 # SDIO/PCIe Basic feature
 #####################
@@ -249,6 +257,7 @@ ifneq ($(CONFIG_SOC_GOOGLE),)
 	DHDCFLAGS += -DCLEAN_IRQ_AFFINITY_HINT
 	DHDCFLAGS += -DIRQ_AFFINITY_BIG_CORE=4
 	DHDCFLAGS += -DIRQ_AFFINITY_SMALL_CORE=4
+	DHDCFLAGS += -DWAKEUP_KSOFTIRQD_POST_NAPI_SCHEDULE
 	# Tx/Rx tasklet bounds
 	DHDCFLAGS += -DDHD_TX_CPL_BOUND=64
 	DHDCFLAGS += -DDHD_TX_POST_BOUND=128
@@ -901,7 +910,6 @@ endif
 DHDCFLAGS += -DENABLE_INSMOD_NO_FW_LOAD
 
 ifeq ($(DRIVER_TYPE),y)
-  DHDCFLAGS += -DWAKEUP_KSOFTIRQD_POST_NAPI_SCHEDULE
   DHDCFLAGS += -DUSE_LATE_INITCALL_SYNC
   # Use kernel strlcpy() implementation instead of one, defined in bcmstdlib_s.c
   DHDCFLAGS += -DBCM_USE_PLATFORM_STRLCPY
@@ -927,7 +935,7 @@ ifneq ($(CONFIG_SOC_GOOGLE),)
 	# LB RXP Flow control to avoid OOM
 	DHDCFLAGS += -DLB_RXP_STOP_THR=500 -DLB_RXP_STRT_THR=499
 	# Dongle init fail
-	DHDCFLAGS += -DPOWERUP_MAX_RETRY=0
+	DHDCFLAGS += -DPOWERUP_MAX_RETRY=1
 	# Explicitly disable Softap 6G
 	DHDCFLAGS += -DWL_DISABLE_SOFTAP_6G
 ifneq ($(filter y, $(CONFIG_BCM4389)),)
