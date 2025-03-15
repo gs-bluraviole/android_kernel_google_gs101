@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Copyright (C) 2023 Google LLC
+
+build --flag_alias=kernel_package=//common:kernel_package
+
+# Debug configs
+import %workspace%/private/devices/google/common/debug/debug.bazelrc
+
+build:factory --//private/devices/google/common:factory
+build:factory --config=pixel_debug_common
+
+# For compatibility. Recommand to use --kernel_package directly.
+build:aosp_staging --kernel_package=@//aosp-staging
+build:use_source_tree_aosp --kernel_package=@//aosp
+build:use_source_tree_aosp_staging --kernel_package=@//aosp-staging
+
+build:download_gki --use_prebuilt_gki
+build:download_gki --use_signed_prebuilts
+build:download_gki --action_env=KLEAF_DOWNLOAD_BUILD_NUMBER_MAP="gki_prebuilts=12786694"
+build:no_download_gki --use_prebuilt_gki=false
+
+build:download_gki_fips140 --//private/devices/google/common:download_prebuilt_gki_fips140=1
+build:no_download_gki_fips140 --//private/devices/google/common:download_prebuilt_gki_fips140=0
+
+# disable GKI prebuilts by default
+#build --config=no_download_gki
+
+# enable GKI prebuilts by default
+build --config=download_gki
+
+# disable download prebuilt GKI fips140.ko by default
+#build --config=no_download_gki_fips140
+
+# enable download prebuilt GKI fips140.ko by default
+build --config=download_gki_fips140
+
+# Testing build, enable gcov and kunit
+build:testing --notrim --gcov --//private/devices/google/common:kunit
+
+# Enable kunit only
+build:kunit --notrim --//private/devices/google/common:kunit
+
+# For compatibility, Recommand to use --config=testing or --config=kunit.
+build:pixel_kunit --config=kunit
+
+# Build 16k page size kernel
+build:16k --page_size=16k --config=no_download_gki --config=no_download_gki_fips140
+
+# Placeholders for soc specific bazelrc files. Add as many as you need.
+try-import %workspace%/.c1.bazelrc
+try-import %workspace%/.c2.bazelrc
+try-import %workspace%/.c3.bazelrc
+try-import %workspace%/.c4.bazelrc
+try-import %workspace%/.c5.bazelrc
+try-import %workspace%/.c6.bazelrc
+try-import %workspace%/.c7.bazelrc
+try-import %workspace%/.c8.bazelrc
+
+# Placeholders for device specific bazelrc files. Add as many as you need.
+try-import %workspace%/.d1.bazelrc
+try-import %workspace%/.d2.bazelrc
+try-import %workspace%/.d3.bazelrc
+try-import %workspace%/.d4.bazelrc
+try-import %workspace%/.d5.bazelrc
+try-import %workspace%/.d6.bazelrc
+try-import %workspace%/.d7.bazelrc
+try-import %workspace%/.d8.bazelrc
+try-import %workspace%/.d9.bazelrc
+try-import %workspace%/.d10.bazelrc
+try-import %workspace%/.d11.bazelrc
+try-import %workspace%/.d12.bazelrc
+try-import %workspace%/.d13.bazelrc
+try-import %workspace%/.d14.bazelrc
+try-import %workspace%/.d15.bazelrc
+try-import %workspace%/.d16.bazelrc
