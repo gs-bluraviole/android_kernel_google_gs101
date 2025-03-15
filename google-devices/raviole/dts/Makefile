@@ -20,7 +20,8 @@ gs101_overlays := \
 	gs101-raven-proto1.dtbo \
 	gs101-raven-proto1_1.dtbo \
 
-gs101_dtbs := \
+DTC_FLAGS := -@
+dtb-$(CONFIG_SOC_GS101) := \
 	gs101/gs101-a0.dtb \
 	gs101/gs101-b0.dtb
 
