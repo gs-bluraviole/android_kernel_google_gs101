@@ -1,0 +1,6 @@
+blocklist bcmdhd4389
+blocklist drv2624
+blocklist ftm5
+blocklist cs40l26_i2c
+blocklist sec_touch
+blocklist dw3000-core-tests.ko
