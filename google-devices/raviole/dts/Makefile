@@ -22,7 +22,6 @@ gs101_overlays := \
 
 DTC_FLAGS := -@
 dtb-$(CONFIG_SOC_GS101) := \
-	gs101/gs101-a0.dtb \
 	gs101/gs101-b0.dtb
 
 # Usage:
