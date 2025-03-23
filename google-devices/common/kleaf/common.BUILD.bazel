@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+"""
+Defines kernel targets which are aliases of real kernel targets from the kernel
+package selected by --kernel_package=<package>.
+"""
+
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+load("@bazel_skylib//rules:select_file.bzl", "select_file")
+load("//common:modules.bzl", "get_gki_modules_list")
+load("//private/devices/google/common/kleaf:kernel_aliases.bzl", "kernel_aliases")
+
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
+
+_KERNEL_TARGETS = [
+    "all_headers_aarch64",
+    "android/abi_gki_aarch64_pixel",
+    "kernel_aarch64_config",
+    "kernel_aarch64_download_or_build",
+    "kernel_aarch64_gki_artifacts_download_or_build",
+    "kernel_aarch64_headers_download_or_build",
+    "kernel_aarch64_images_download_or_build",
+    "kernel_aarch64_modules",
+    "kernel_aarch64_sources",
+    "set_kernel_dir_build_config",
+] + [
+    "kernel_aarch64/{}".format(m)
+    for m in get_gki_modules_list("arm64")
+]
+
+_KERNEL_PACKAGES = [
+    "@//aosp",
+    "@//aosp-staging",
+]
+
+string_flag(
+    name = "kernel_package",
+    build_setting_default = "@//aosp",
+    values = _KERNEL_PACKAGES,
+)
+
+kernel_aliases(
+    name = "kernel_aliases",
+    flag = ":kernel_package",
+    packages = _KERNEL_PACKAGES,
+    targets = _KERNEL_TARGETS,
+)
+
+alias(
+    name = "kernel_aarch64",
+    actual = ":kernel_aarch64_download_or_build",
+)
+
+alias(
+    name = "kernel_aarch64_gki_artifacts",
+    actual = ":kernel_aarch64_gki_artifacts_download_or_build",
+)
+
+alias(
+    name = "kernel_aarch64_headers",
+    actual = ":kernel_aarch64_headers_download_or_build",
+)
+
+alias(
+    name = "kernel_aarch64_images",
+    actual = ":kernel_aarch64_images_download_or_build",
+)
+
+string_flag(
+    name = "kernel_compression",
+    build_setting_default = "lz4",
+    values = [
+        "lz4",
+        "gz",
+        "",
+    ],
+)
+
+config_setting(
+    name = "kernel_compression_is_lz4",
+    flag_values = {"kernel_compression": "lz4"},
+)
+
+config_setting(
+    name = "kernel_compression_is_gz",
+    flag_values = {"kernel_compression": "gz"},
+)
+
+select_file(
+    name = "kernel_aarch64_gki_boot_image_selection",
+    srcs = ":kernel_aarch64_gki_artifacts",
+    subpath = select({
+        ":kernel_compression_is_lz4": "boot-lz4.img",
+        ":kernel_compression_is_gz": "boot-gz.img",
+        "//conditions:default": "boot.img",
+    }),
+)
+
+copy_file(
+    name = "kernel_aarch64_gki_boot_image",
+    src = ":kernel_aarch64_gki_boot_image_selection",
+    out = "boot.img",
+)

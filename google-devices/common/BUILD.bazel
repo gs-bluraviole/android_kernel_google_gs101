@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+load("@bazel_skylib//lib:paths.bzl", "paths")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("//private/devices/google/common:constants.bzl", "PIXEL_GKI_MODULES_LIST")
+load("//private/devices/google/common/kleaf:extracted_system_dlkm.bzl", "extracted_system_dlkm")
+
+package(
+    default_visibility = [
+        "//private/devices/google:__subpackages__",
+    ],
+)
+
+label_flag(
+    name = "kernel",
+    build_setting_default = "//common:kernel_aarch64",
+    visibility = [
+        "//private/devices/google:__subpackages__",
+        "//private/google-modules:__subpackages__",
+    ],
+)
+
+bool_flag(
+    name = "download_prebuilt_gki_fips140",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_download_fips140",
+    flag_values = {
+        ":download_prebuilt_gki_fips140": "1",
+    },
+)
+
+config_setting(
+    name = "disable_download_fips140",
+    flag_values = {
+        ":download_prebuilt_gki_fips140": "0",
+    },
+)
+
+# Do not use this flag directly, use --config=testing or --config=kunit,
+# which will enable this and any necessary dependencies.
+bool_flag(
+    name = "kunit",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "kunit_enabled",
+    flag_values = {
+        ":kunit": "1",
+    },
+)
+
+bool_flag(
+    name = "factory",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "factory_build",
+    flag_values = {
+        ":factory": "true",
+    },
+)
+
+filegroup(
+    name = "sepolicy",
+    srcs = glob([
+        "sepolicy/*",
+    ]),
+)
+
+extracted_system_dlkm(
+    name = "kernel_gki_modules",
+    gki_modules = [paths.basename(m) for m in PIXEL_GKI_MODULES_LIST],
+    images = "//common:kernel_aarch64_images",
+)
