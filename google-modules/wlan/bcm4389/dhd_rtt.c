@@ -2138,11 +2138,8 @@ exit:
 void
 dhd_rtt_set_geofence_cur_target_idx(dhd_pub_t *dhd, int8 idx)
 {
-	int8 target_cnt = 0;
 	rtt_status_info_t *rtt_status = GET_RTTSTATE(dhd);
 
-	target_cnt = rtt_status->geofence_cfg.geofence_target_cnt;
-	ASSERT(idx < target_cnt);
 	rtt_status->geofence_cfg.cur_target_idx = idx;
 	return;
 }
@@ -3996,7 +3993,7 @@ dhd_rtt_convert_results_to_host_v3(rtt_result_t *rtt_result, const uint8 *p_data
 	wl_proxd_bitflips_t tof_target_bitflips = 0;
 	int16 rssi = 0;
 	int32 dist = 0;
-	uint32 chanspec = 0, gd_variance = 0;
+	uint32 chanspec = 0;
 	uint8 num_ftm = 0;
 	char *ftm_frame_types[] =  FTM_FRAME_TYPES;
 	rtt_report_t *rtt_report = &(rtt_result->report);
@@ -4197,7 +4194,6 @@ dhd_rtt_convert_results_to_host_v3(rtt_result_t *rtt_result, const uint8 *p_data
 					ltoh16_ua(&p_sample->tof_tgt_bitflips);
 				dist = ltoh32_ua(&p_sample->distance);
 				chanspec = ltoh32_ua(&p_sample->chanspec);
-				gd_variance = ltoh32_ua(&p_sample->gd_variance);
 			} else {
 				rssi = -1;
 				snr = 0;

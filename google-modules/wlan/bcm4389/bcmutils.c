@@ -2074,6 +2074,7 @@ bcm_mwbmap_show(struct bcm_mwbmap * mwbmap_hdl)
 	return;
 }
 
+#ifdef BCM_MWBMAP_DEBUG
 /* Audit a hierarchical multiword bitmap */
 void
 bcm_mwbmap_audit(struct bcm_mwbmap * mwbmap_hdl)
@@ -2104,6 +2105,7 @@ bcm_mwbmap_audit(struct bcm_mwbmap * mwbmap_hdl)
 
 	ASSERT((int)free_cnt == mwbmap_p->ifree);
 }
+#endif
 
 /* END : Multiword bitmap based 64bit to Unique 32bit Id allocator. */
 

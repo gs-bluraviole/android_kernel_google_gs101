@@ -717,7 +717,6 @@ dhd_tcpack_suppress(dhd_pub_t *dhdp, void *pkt)
 	uint8 *new_ip_hdr;		/* IP header of the new packet */
 	uint8 *new_tcp_hdr;		/* TCP header of the new packet */
 	uint32 new_ip_hdr_len;	/* IP header length of the new packet */
-	uint32 cur_framelen;
 	uint32 new_tcp_ack_num;		/* TCP acknowledge number of the new packet */
 	uint16 new_ip_total_len;	/* Total length of IP packet for the new packet */
 	uint32 new_tcp_hdr_len;		/* TCP header length of the new packet */
@@ -732,13 +731,6 @@ dhd_tcpack_suppress(dhd_pub_t *dhdp, void *pkt)
 		goto exit;
 
 	new_ether_hdr = PKTDATA(dhdp->osh, pkt);
-	cur_framelen = PKTLEN(dhdp->osh, pkt);
-
-	if (cur_framelen < TCPACKSZMIN || cur_framelen > TCPACKSZMAX) {
-		DHD_TRACE(("%s %d: Too short or long length %d to be TCP ACK\n",
-			__FUNCTION__, __LINE__, cur_framelen));
-		goto exit;
-	}
 
 	new_ether_type = new_ether_hdr[12] << 8 | new_ether_hdr[13];
 
@@ -751,9 +743,6 @@ dhd_tcpack_suppress(dhd_pub_t *dhdp, void *pkt)
 	DHD_TRACE(("%s %d: IP pkt! 0x%x\n", __FUNCTION__, __LINE__, new_ether_type));
 
 	new_ip_hdr = new_ether_hdr + ETHER_HDR_LEN;
-	cur_framelen -= ETHER_HDR_LEN;
-
-	ASSERT(cur_framelen >= IPV4_MIN_HEADER_LEN);
 
 	new_ip_hdr_len = IPV4_HLEN(new_ip_hdr);
 	if (IP_VER(new_ip_hdr) != IP_VER_4 || IPV4_PROT(new_ip_hdr) != IP_PROT_TCP) {
@@ -763,9 +752,6 @@ dhd_tcpack_suppress(dhd_pub_t *dhdp, void *pkt)
 	}
 
 	new_tcp_hdr = new_ip_hdr + new_ip_hdr_len;
-	cur_framelen -= new_ip_hdr_len;
-
-	ASSERT(cur_framelen >= TCP_MIN_HEADER_LEN);
 
 	DHD_TRACE(("%s %d: TCP pkt!\n", __FUNCTION__, __LINE__));
 
@@ -940,7 +926,6 @@ dhd_tcpdata_info_get(dhd_pub_t *dhdp, void *pkt)
 	uint8 *ip_hdr;		/* IP header of the new packet */
 	uint8 *tcp_hdr;		/* TCP header of the new packet */
 	uint32 ip_hdr_len;	/* IP header length of the new packet */
-	uint32 cur_framelen;
 	uint16 ip_total_len;	/* Total length of IP packet for the new packet */
 	uint32 tcp_hdr_len;		/* TCP header length of the new packet */
 	uint32 tcp_seq_num;		/* TCP sequence number of the new packet */
@@ -958,7 +943,6 @@ dhd_tcpdata_info_get(dhd_pub_t *dhdp, void *pkt)
 		goto exit;
 
 	ether_hdr = PKTDATA(dhdp->osh, pkt);
-	cur_framelen = PKTLEN(dhdp->osh, pkt);
 
 	ether_type = ether_hdr[12] << 8 | ether_hdr[13];
 
@@ -971,7 +955,6 @@ dhd_tcpdata_info_get(dhd_pub_t *dhdp, void *pkt)
 	DHD_TRACE(("%s %d: IP pkt! 0x%x\n", __FUNCTION__, __LINE__, ether_type));
 
 	ip_hdr = ether_hdr + ETHER_HDR_LEN;
-	cur_framelen -= ETHER_HDR_LEN;
 
 	ASSERT(cur_framelen >= IPV4_MIN_HEADER_LEN);
 
@@ -983,9 +966,6 @@ dhd_tcpdata_info_get(dhd_pub_t *dhdp, void *pkt)
 	}
 
 	tcp_hdr = ip_hdr + ip_hdr_len;
-	cur_framelen -= ip_hdr_len;
-
-	ASSERT(cur_framelen >= TCP_MIN_HEADER_LEN);
 
 	DHD_TRACE(("%s %d: TCP pkt!\n", __FUNCTION__, __LINE__));
 
@@ -1169,7 +1149,6 @@ dhd_tcpack_hold(dhd_pub_t *dhdp, void *pkt, int ifidx)
 	uint8 *new_ip_hdr;		/* IP header of the new packet */
 	uint8 *new_tcp_hdr;		/* TCP header of the new packet */
 	uint32 new_ip_hdr_len;	/* IP header length of the new packet */
-	uint32 cur_framelen;
 	uint32 new_tcp_ack_num;		/* TCP acknowledge number of the new packet */
 	uint16 new_ip_total_len;	/* Total length of IP packet for the new packet */
 	uint32 new_tcp_hdr_len;		/* TCP header length of the new packet */
@@ -1188,13 +1167,6 @@ dhd_tcpack_hold(dhd_pub_t *dhdp, void *pkt, int ifidx)
 	}
 
 	new_ether_hdr = PKTDATA(dhdp->osh, pkt);
-	cur_framelen = PKTLEN(dhdp->osh, pkt);
-
-	if (cur_framelen < TCPACKSZMIN || cur_framelen > TCPACKSZMAX) {
-		DHD_TRACE(("%s %d: Too short or long length %d to be TCP ACK\n",
-			__FUNCTION__, __LINE__, cur_framelen));
-		goto exit;
-	}
 
 	new_ether_type = new_ether_hdr[12] << 8 | new_ether_hdr[13];
 
@@ -1207,7 +1179,6 @@ dhd_tcpack_hold(dhd_pub_t *dhdp, void *pkt, int ifidx)
 	DHD_TRACE(("%s %d: IP pkt! 0x%x\n", __FUNCTION__, __LINE__, new_ether_type));
 
 	new_ip_hdr = new_ether_hdr + ETHER_HDR_LEN;
-	cur_framelen -= ETHER_HDR_LEN;
 
 	ASSERT(cur_framelen >= IPV4_MIN_HEADER_LEN);
 
@@ -1219,9 +1190,6 @@ dhd_tcpack_hold(dhd_pub_t *dhdp, void *pkt, int ifidx)
 	}
 
 	new_tcp_hdr = new_ip_hdr + new_ip_hdr_len;
-	cur_framelen -= new_ip_hdr_len;
-
-	ASSERT(cur_framelen >= TCP_MIN_HEADER_LEN);
 
 	DHD_TRACE(("%s %d: TCP pkt!\n", __FUNCTION__, __LINE__));
 
@@ -1395,7 +1363,6 @@ dhd_tcpdata_get_flag(dhd_pub_t *dhdp, void *pkt)
 	}
 
 	ip_hdr = ether_hdr + ETHER_HDR_LEN;
-	cur_framelen -= ETHER_HDR_LEN;
 
 	if (cur_framelen < IPV4_MIN_HEADER_LEN) {
 		return FLAG_OTHERS;
