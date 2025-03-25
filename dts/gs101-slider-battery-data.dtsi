@@ -49,6 +49,14 @@ maxim,config {
 			/* 0x0029 */	0xceb4	/* FilterCFG */
 			/* 0x003c */	0x1680	/* TaskPeriod */
 		>;
+		maxim,fg-aafv = /bits/ 32 <
+			200     0   95  0xff
+			400    20   90  0xff
+			600    40   85  0xff
+			800    60   80  0xff
+			1000   80   75  0xff
+			2000  100   70  0xff
+		>;
 	};
 
 	/* COS: 2733 (b/156053400) */
@@ -92,6 +100,14 @@ maxim,config {
 			/* 0x0029 */	0xceb4	/* FilterCFG */
 			/* 0x003c */	0x1680	/* TaskPeriod */
 		>;
+		maxim,fg-aafv = /bits/ 32 <
+			200     0   95  0xff
+			400    20   90  0xff
+			600    40   85  0xff
+			800    60   80  0xff
+			1000   80   75  0xff
+			2000  100   70  0xff
+		>;
 	};
 
 	/* LSN: 2729 (b/156053831) */
@@ -134,6 +150,14 @@ maxim,config {
 			/* 0x0049 */	0x2241	/* ConvCFG */
 			/* 0x0029 */	0xceb4	/* FilterCFG */
 			/* 0x003c */	0x1680	/* TaskPeriod */
+		>;
+		maxim,fg-aafv = /bits/ 32 <
+			200     0   95  0xff
+			400    20   90  0xff
+			600    40   85  0xff
+			800    60   80  0xff
+			1000   80   75  0xff
+			2000  100   70  0xff
 		>;
 	};
 
@@ -183,6 +207,14 @@ maxim,config {
 			/* 0x0049 */    0x2241  /* ConvCFG */
 			/* 0x0029 */    0xceb4  /* FilterCFG */
 			/* 0x003c */	0x1680	/* TaskPeriod */
+		>;
+		maxim,fg-aafv = /bits/ 32 <
+			200     0   95  0xff
+			400    20   90  0xff
+			600    40   85  0xff
+			800    60   80  0xff
+			1000   80   75  0xff
+			2000  100   70  0xff
 		>;
 	};
 

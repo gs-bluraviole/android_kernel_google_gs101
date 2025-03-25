@@ -3,6 +3,7 @@
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load(
     "//build/kernel/kleaf:kernel.bzl",
+    "dtb_image",
     "kernel_abi",
     "kernel_build",
     "kernel_build_config",
@@ -16,6 +17,8 @@ load(
 load("//private/devices/google/common/kleaf:create_file.bzl", "create_file")
 load("//private/devices/google/gs101:constants.bzl", "GS101_DTBS", "GS101_MODULE_OUTS")
 load(":constants.bzl", "RAVIOLE_DTBOS")
+
+exports_files(["raviole_defconfig"])
 
 kernel_build_config(
     name = "build_config",
@@ -69,10 +72,7 @@ kernel_build(
     srcs = [":kernel_sources"],
     outs = [
         ".config",
-    ] + [
-        "gs101/{}".format(dtb)
-        for dtb in GS101_DTBS
-    ] + RAVIOLE_DTBOS,
+    ] + RAVIOLE_DTBOS + GS101_DTBS,
     base_kernel = "//common:kernel_aarch64",
     build_config = ":build_config",
     collect_unstripped_modules = True,
@@ -86,6 +86,18 @@ kernel_build(
     ],
     module_outs = GS101_MODULE_OUTS,
     strip_modules = True,
+)
+
+dtb_image(
+    name = "dtb_image",
+    srcs = [":kernel/" + dtb for dtb in GS101_DTBS],
+    out = "dtb.img",
+)
+
+filegroup(
+    name = "dtbos",
+    srcs = [":kernel/" + dtbo for dtbo in RAVIOLE_DTBOS],
+    visibility = ["//private/devices/google/gs101:__subpackages__"],
 )
 
 kernel_module_group(
@@ -110,6 +122,7 @@ kernel_module_group(
         "//private/google-modules/uwb/qorvo/dw3000/kernel:uwb.dw3000",
         "//private/google-modules/wlan/bcm4389:bcmdhd4389",
     ],
+    visibility = ["//private/devices/google/gs101:__subpackages__"],
 )
 
 kernel_modules_install(
@@ -165,7 +178,7 @@ kernel_images(
     build_dtbo = True,
     build_initramfs = True,
     build_vendor_dlkm = True,
-    dtbo_srcs = [":kernel/" + dtbo for dtbo in RAVIOLE_DTBOS],
+    dtbo_srcs = [":dtbos"],
     kernel_build = ":kernel",
     kernel_modules_install = ":kernel_modules_install",
     modules_list = ":vendor_ramdisk_modules_list",
@@ -194,6 +207,7 @@ copy_to_dist_dir(
     name = "dist",
     data = [
         # keep sorted
+        ":dtb_image",
         ":insmod_cfgs",
         ":kernel",
         ":kernel_images",

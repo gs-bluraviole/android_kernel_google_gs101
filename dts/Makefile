@@ -51,8 +51,8 @@ endef
 define multi_dtbs_overlay
 	$(foreach base, $1, \
 		$(foreach overlay, $2, \
-			$(eval $(call DTBS_overlay_template, $(overlay), $(base), $(base:%.dtb=%))) \
-			$(eval $(call DTB_object_template, $3, $(overlay), $(base:%.dtb=%)))))
+			$(eval $(call DTBS_overlay_template, $(overlay), $(base), $(notdir $(base:%.dtb=%)))) \
+			$(eval $(call DTB_object_template, $3, $(overlay), $(notdir $(base:%.dtb=%))))))
 endef
 
 # Create the -dtbs and dtb-y constructs. We can do this by looping through the
@@ -61,4 +61,4 @@ endef
 # overlays. For the base dtbs, kbuild will expose the symbols as needed for the
 # overlays. Additionally, kbuild will statically apply the overlay to the base
 # dtb which could be used to verify the overlay applies cleanly.
-$(call multi_dtbs_overlay, $(gs101_dtbs), $(gs101_overlays), $(CONFIG_SOC_GS101))
+$(call multi_dtbs_overlay, $(gs101_dtbs), $(gs101_overlays), y)
