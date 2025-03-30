@@ -61,7 +61,6 @@ ifeq ($(MALI_KCONFIG_EXT_PREFIX),)
         CONFIG_MALI_PLATFORM_NAME ?= "devicetree"
         CONFIG_MALI_TRACE_POWER_GPU_WORK_PERIOD ?= y
         CONFIG_MALI_GATOR_SUPPORT ?= n
-        CONFIG_MALI_ARBITRATION ?= n
         CONFIG_MALI_PARTITION_MANAGER ?= n
 
 
@@ -168,7 +167,6 @@ ifeq ($(MALI_KCONFIG_EXT_PREFIX),)
         endif
     else
         # Prevent misuse when CONFIG_MALI_MIDGARD=n
-        CONFIG_MALI_ARBITRATION = n
         CONFIG_MALI_KUTF = n
         CONFIG_MALI_KUTF_IRQ_TEST = n
         CONFIG_MALI_KUTF_CLK_RATE_TRACE = y
@@ -179,7 +177,6 @@ ifeq ($(MALI_KCONFIG_EXT_PREFIX),)
     CONFIGS += \
         CONFIG_MALI_MIDGARD \
         CONFIG_MALI_GATOR_SUPPORT \
-        CONFIG_MALI_ARBITRATION \
         CONFIG_MALI_PARTITION_MANAGER \
         CONFIG_MALI_REAL_HW \
         CONFIG_MALI_DEVFREQ \
@@ -223,9 +220,6 @@ ifeq ($(MALI_KCONFIG_EXT_PREFIX),)
 
 
 endif
-
-THIS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
--include $(THIS_DIR)/../arbitration/Makefile
 
 # MAKE_ARGS to pass the custom CONFIGs on out-of-tree build
 #
