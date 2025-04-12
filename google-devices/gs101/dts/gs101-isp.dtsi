@@ -377,6 +377,7 @@
 			<&sysmmu_csis1>;
 		power-domains = <&pd_pdp>;
 		samsung,iommu-group = <&iommu_group_isp>;
+		lwis,iommu-best-fit-algo;
 		samsung,tzmp = "true";
 	};
 

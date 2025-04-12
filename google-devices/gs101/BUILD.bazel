@@ -112,6 +112,7 @@ kernel_module(
         "drivers/input/keycombo.ko",
         "drivers/input/keydebug.ko",
         "drivers/input/misc/vl53l1/stmvl53l1.ko",
+        "drivers/iommu/iovad-best-fit-algo.ko",
         "drivers/iommu/samsung-iommu-group.ko",
         "drivers/iommu/samsung-secure-iova.ko",
         "drivers/iommu/samsung_iommu.ko",
