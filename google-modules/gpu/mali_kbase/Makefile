@@ -32,7 +32,7 @@ endif
 #
 
 # Debug Ftrace configuration options
-CONFIG_MALI_SYSTEM_TRACE=y
+CONFIG_MALI_SYSTEM_TRACE=n
 
 # Core kbase configuration options
 CONFIG_MALI_EXPERT=y
