@@ -3787,6 +3787,7 @@ static int cs35l41_enter_hibernate(struct cs35l41_private *cs35l41)
 		regmap_read(cs35l41->regmap, cs35l41_ctl_cache_regs[i],
 			    &cs35l41->ctl_cache[i]);
 
+	disable_irq(cs35l41->irq);
 	/* Disable interrupts */
 	regmap_write(cs35l41->regmap, CS35L41_IRQ1_MASK1, 0xFFFFFFFF);
 
@@ -3930,6 +3931,8 @@ static int cs35l41_exit_hibernate(struct cs35l41_private *cs35l41)
 		ret = cs35l41_restore(cs35l41);
 		usleep_range(4000, 5000);
 	} while (ret < 0 && --retries > 0);
+
+	enable_irq(cs35l41->irq);
 
 	if (retries <= 0)
 		dev_err(cs35l41->dev, "Failed to exit from hibernate\n");
