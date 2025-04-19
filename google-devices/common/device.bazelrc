@@ -6,11 +6,13 @@ build --flag_alias=kernel_package=//common:kernel_package
 build --flag_alias=download_prebuilt_gki_fips140=//private/devices/google/common:download_prebuilt_gki_fips140
 
 # Prebuilt GKI build number, used when --use_prebuilt_gki=true.
-build --action_env=KLEAF_DOWNLOAD_BUILD_NUMBER_MAP="gki_prebuilts=12670093"
+# gki_prebuilts is for 4KB page kernel build, gki_prebuilts_aarch64_16k is for 16KB page kernel build
+# Notice! always set gki_prebuilts and gki_prebuilts_aarch64_16k to the same GKI build number
+build --action_env=KLEAF_DOWNLOAD_BUILD_NUMBER_MAP="gki_prebuilts=13202960,gki_prebuilts_aarch64_16k=13202960"
 
 # Use prebuilt GKI
-# build --use_prebuilt_gki=true
-# build --use_signed_prebuilts
+build --use_prebuilt_gki=true
+build --use_signed_prebuilts=true
 
 # Use prebuilt fips140.ko
 build --download_prebuilt_gki_fips140=true
@@ -26,6 +28,8 @@ build:factory --//private/devices/google/common:factory
 build:testing --notrim
 build:testing --gcov
 build:testing --//private/devices/google/common:kunit
+build:testing --use_prebuilt_gki=false
+build:testing --use_signed_prebuilts=false
 
 # Build kunit modules
 build:kunit --notrim
@@ -33,14 +37,20 @@ build:kunit --//private/devices/google/common:kunit
 
 # Build 16k page size kernel
 build:16k --page_size=16k
-build:16k --use_prebuilt_gki=false
 build:16k --download_prebuilt_gki_fips140=false
+build:16k --use_signed_prebuilts=false
 
 # For compatibility only. Do no introduce new usage of these configs.
 # Use --kernel_package directly.
 build:aosp_staging --kernel_package=@//aosp-staging
+build:aosp_staging --use_prebuilt_gki=false
+build:aosp_staging --use_signed_prebuilts=false
 build:use_source_tree_aosp --kernel_package=@//aosp
+build:use_source_tree_aosp --use_prebuilt_gki=false
+build:use_source_tree_aosp --use_signed_prebuilts=false
 build:use_source_tree_aosp_staging --kernel_package=@//aosp-staging
+build:use_source_tree_aosp_staging --use_prebuilt_gki=false
+build:use_source_tree_aosp_staging --use_signed_prebuilts=false
 # Use --config=testing or --config=kunit.
 build:pixel_kunit --config=kunit
 # Use --download_prebuilt_gki_fips140 directly.

@@ -22,9 +22,13 @@ _KERNEL_TARGETS = [
     "android/abi_gki_aarch64_pixel",
     "kernel_aarch64_config",
     "kernel_aarch64_download_or_build",
+    "kernel_aarch64_16k_download_or_build",
     "kernel_aarch64_gki_artifacts_download_or_build",
+    "kernel_aarch64_16k_gki_artifacts_download_or_build",
     "kernel_aarch64_headers_download_or_build",
+    "kernel_aarch64_16k_headers_download_or_build",
     "kernel_aarch64_images_download_or_build",
+    "kernel_aarch64_16k_images_download_or_build",
     "kernel_aarch64_modules",
     "kernel_aarch64_sources",
     "set_kernel_dir_build_config",
@@ -53,22 +57,34 @@ kernel_aliases(
 
 alias(
     name = "kernel_aarch64",
-    actual = ":kernel_aarch64_download_or_build",
+    actual = select({
+        "//build/kernel/kleaf:page_size_16k": ":kernel_aarch64_16k_download_or_build",
+        "//conditions:default": ":kernel_aarch64_download_or_build",
+    }),
 )
 
 alias(
     name = "kernel_aarch64_gki_artifacts",
-    actual = ":kernel_aarch64_gki_artifacts_download_or_build",
+    actual = select({
+        "//build/kernel/kleaf:page_size_16k": ":kernel_aarch64_16k_gki_artifacts_download_or_build",
+        "//conditions:default": ":kernel_aarch64_gki_artifacts_download_or_build",
+    }),
 )
 
 alias(
     name = "kernel_aarch64_headers",
-    actual = ":kernel_aarch64_headers_download_or_build",
+    actual = select({
+        "//build/kernel/kleaf:page_size_16k": ":kernel_aarch64_16k_headers_download_or_build",
+        "//conditions:default": ":kernel_aarch64_headers_download_or_build",
+    }),
 )
 
 alias(
     name = "kernel_aarch64_images",
-    actual = ":kernel_aarch64_images_download_or_build",
+    actual = select({
+        "//build/kernel/kleaf:page_size_16k": ":kernel_aarch64_16k_images_download_or_build",
+        "//conditions:default": ":kernel_aarch64_images_download_or_build",
+    }),
 )
 
 string_flag(
