@@ -41,10 +41,7 @@
 #define bcl_cb_clr_irq(bcl, v) (((bcl)->ifpmic == MAX77759) ? \
         max77759_clr_irq(bcl, v) : max77779_clr_irq(bcl, v))
 #define bcl_vimon_read(bcl) (((bcl)->ifpmic == MAX77759) ? \
-       max77759_vimon_read(bcl) : max77779_vimon_read(bcl))
-#define bcl_req_vimon_conv(bcl, idx) (((bcl)->ifpmic == MAX77759) ? \
-				max77759_req_vimon_conv(bcl, idx) :\
-				max77779_req_vimon_conv(bcl, idx))
+	max77759_vimon_read(bcl) : max77779_vimon_read(bcl))
 
 #define DELTA_5MS			(5 * NSEC_PER_MSEC)
 #define DELTA_10MS			(10 * NSEC_PER_MSEC)
@@ -52,6 +49,7 @@
 #define MILLI_TO_MICRO			1000
 #define IRQ_ENABLE_DELAY_MS		50
 #define NOT_USED			9999
+#define TIMEOUT_1S			1000
 #define TIMEOUT_5S			5000
 #define TIMEOUT_5000US			5000
 #define TIMEOUT_10000US			10000
@@ -81,6 +79,7 @@
 #define MAX77779_VIMON_NV_PRE_LSB 78122
 #define MAX77779_VIMON_NA_PRE_LSB 781250
 #define BAT_KTIMER_LIMIT_MS 34
+#define LAST_CURR_RD_CNT_MAX 10
 
 #if IS_ENABLED(CONFIG_SOC_GS101)
 #define MAIN_OFFSRC1 S2MPG10_PM_OFFSRC
@@ -376,6 +375,7 @@ struct bcl_device {
 	struct bcl_core_conf core_conf[SUBSYSTEM_SOURCE_MAX];
 	struct bcl_cpu_buff_conf cpu_buff_conf[CPU_CLUSTER_MAX];
 	struct notifier_block cpu_nb;
+	struct delayed_work rd_last_curr_work;
 
 	bool batt_psy_initialized;
 	bool enabled;
@@ -387,6 +387,7 @@ struct bcl_device {
 	unsigned int pwronsrc;
 	unsigned int irq_delay;
 	unsigned int last_current;
+	unsigned int last_curr_rd_retry_cnt;
 
 	unsigned int vdroop1_pin;
 	unsigned int vdroop2_pin;
@@ -486,6 +487,7 @@ struct bcl_device {
 
 	bool bat_ktimer_en;
 	unsigned int bat_ktimer;
+	struct wakeup_source *ws;
 };
 
 extern void google_bcl_irq_update_lvl(struct bcl_device *bcl_dev, int index, unsigned int lvl);
@@ -527,7 +529,7 @@ int google_pwr_loop_trigger_mitigation(struct bcl_device *bcl_dev);
 int max77759_vimon_read(struct bcl_device *bcl_dev);
 int max77779_vimon_read(struct bcl_device *bcl_dev);
 int max77759_req_vimon_conv(struct bcl_device *bcl_dev, int idx);
-int max77779_req_vimon_conv(struct bcl_device *bcl_dev, int idx);
+int max77779_vimon_register_callback(struct bcl_device *bcl_dev);
 
 #if IS_ENABLED(CONFIG_SOC_ZUMAPRO)
 int max77779_adjust_bat_open_to(struct bcl_device *bcl_dev, bool enable);

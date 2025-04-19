@@ -259,6 +259,7 @@ static void google_bcl_release_throttling(struct bcl_zone *zone)
 	trace_bcl_zone_stats(zone, 0);
 
 	if (zone->irq_type == IF_PMIC) {
+		bcl_cb_clr_irq(bcl_dev, zone->idx);
 		update_irq_end_times(bcl_dev, zone->idx);
 #if IS_ENABLED(CONFIG_SOC_ZUMAPRO)
 		if (zone->idx >= UVLO1 && zone->idx <= BATOILO2 && bcl_dev->ifpmic == MAX77779)
@@ -269,8 +270,10 @@ static void google_bcl_release_throttling(struct bcl_zone *zone)
 		gpio_set_value(bcl_dev->modem_gpio2_pin, 0);
 	update_tz(zone, zone->idx, false);
 
-	if (bcl_dev->bat_ktimer_en && zone->idx == BATOILO)
+	if (bcl_dev->bat_ktimer_en && zone->idx == BATOILO) {
 		hrtimer_cancel(&(bcl_dev->hr_timer));
+		wakeup_source_unregister(bcl_dev->ws);
+	}
 }
 
 static void google_warn_work(struct work_struct *work)
@@ -443,6 +446,8 @@ static int google_bcl_remove_thermal(struct bcl_device *bcl_dev)
 	cpu_pm_unregister_notifier(&bcl_dev->cpu_nb);
 	if (bcl_dev->non_monitored_module_ids != NULL)
 		kfree(bcl_dev->non_monitored_module_ids);
+	if (bcl_dev->rd_last_curr_work.work.func != NULL)
+		cancel_delayed_work_sync(&bcl_dev->rd_last_curr_work);
 	google_bcl_remove_data_logging(bcl_dev);
 #if IS_ENABLED(CONFIG_SOC_ZUMAPRO)
 	google_bcl_remove_votable(bcl_dev);
@@ -624,6 +629,9 @@ static void google_irq_triggered_work(struct work_struct *work)
 
 	idx = zone->idx;
 	bcl_dev = zone->parent;
+
+	google_bcl_upstream_state(zone, START);
+
 	if (zone->bcl_pin != NOT_USED) {
 		if (bcl_dev->ifpmic == MAX77759 && idx >= UVLO2 && idx <= BATOILO2) {
 			bcl_cb_get_irq(bcl_dev, &irq_val);
@@ -641,7 +649,6 @@ static void google_irq_triggered_work(struct work_struct *work)
 						ktime_to_ms(ktime_get());
 			}
 		} else {
-			google_bcl_upstream_state(zone, START);
 			google_bcl_release_throttling(zone);
 			return;
 		}
@@ -656,6 +663,11 @@ static void google_irq_triggered_work(struct work_struct *work)
 	idx = zone->idx;
 	bcl_dev = zone->parent;
 
+	google_bcl_start_data_logging(bcl_dev, idx);
+
+	/* LIGHT phase */
+	google_bcl_upstream_state(zone, LIGHT);
+
 	if (bcl_dev->batt_psy_initialized) {
 		atomic_inc(&zone->bcl_cnt);
 		ocpsmpl_read_stats(bcl_dev, &zone->bcl_stats, bcl_dev->batt_psy);
@@ -664,16 +676,8 @@ static void google_irq_triggered_work(struct work_struct *work)
 
 	trace_bcl_zone_stats(zone, 1);
 
-	google_bcl_start_data_logging(bcl_dev, idx);
-
-	/* LIGHT phase */
-	if (google_bcl_wait_for_response_locked(zone, TIMEOUT_5MS) > 0)
-		return;
-	google_bcl_upstream_state(zone, LIGHT);
-
 	if (zone->irq_type == IF_PMIC) {
 		update_irq_start_times(bcl_dev, idx);
-		bcl_req_vimon_conv(bcl_dev, idx);
 	}
 
 	if (idx == BATOILO && bcl_dev->config_modem)
@@ -688,6 +692,10 @@ static void google_irq_triggered_work(struct work_struct *work)
 		return;
 	google_bcl_upstream_state(zone, HEAVY);
 	/* We most likely have to shutdown after this */
+
+	/* Reset Mitigation module if we are still alive */
+	atomic_set(&bcl_dev->mitigation_module_ids, 0);
+
 	/* HEAVY phase */
 	/* IRQ deasserted */
 }
@@ -706,12 +714,14 @@ static irqreturn_t vdroop_irq_thread_fn(int irq, void *data)
 	/* This is only BATOILO */
 	zone = bcl_dev->zone[BATOILO];
 	if (zone) {
-		if (bcl_dev->bat_ktimer_en)
+		if (bcl_dev->bat_ktimer_en) {
+			bcl_dev->ws = wakeup_source_register(NULL, "bcl_overcurrent_wake");
 			hrtimer_start(&(bcl_dev->hr_timer),
 				      ktime_set(bcl_dev->bat_ktimer / 1000,
 						(bcl_dev->bat_ktimer % 1000) *
 							1000000),
 				      HRTIMER_MODE_REL);
+		}
 		atomic_inc(&zone->last_triggered.triggered_cnt[START]);
 		zone->last_triggered.triggered_time[START] =
 			ktime_to_ms(ktime_get());
@@ -1224,6 +1234,41 @@ static void google_bcl_parse_qos(struct bcl_device *bcl_dev)
 	bcl_dev->throttle = false;
 }
 
+static int google_bcl_update_last_curr(struct bcl_device *bcl_dev)
+{
+	int ret;
+	u16 readout;
+
+	bcl_dev->last_curr_rd_retry_cnt--;
+	ret = max77779_external_fg_reg_read(bcl_dev->fg_pmic_dev,
+					    MAX77779_FG_MaxMinCurr,
+					    &readout);
+	if (ret == -EAGAIN)
+		return ret;
+
+	if (ret < 0) {
+		dev_err(bcl_dev->device, "bcl read of last current failed: %d\n", ret);
+		return ret;
+	}
+
+	readout &= MAX77779_FG_MaxMinCurr_MAXCURR_MASK;
+	readout = readout >> MAX77779_FG_MaxMinCurr_MAXCURR_SHIFT;
+	bcl_dev->last_current = readout;
+	dev_dbg(bcl_dev->device, "LAST CURRENT: %#x\n", bcl_dev->last_current);
+
+	return ret;
+}
+
+static void google_bcl_rd_last_curr(struct work_struct *work)
+{
+	struct bcl_device *bcl_dev = container_of(work, struct bcl_device,
+						  rd_last_curr_work.work);
+
+	if (google_bcl_update_last_curr(bcl_dev) == -EAGAIN && bcl_dev->last_curr_rd_retry_cnt > 0)
+		schedule_delayed_work(&bcl_dev->rd_last_curr_work,
+				      msecs_to_jiffies(TIMEOUT_5S));
+}
+
 static int intf_pmic_init(struct bcl_device *bcl_dev)
 {
 	int ret;
@@ -1460,7 +1505,6 @@ static int google_set_intf_pmic(struct bcl_device *bcl_dev, struct platform_devi
 {
 	int ret = 0;
 	u32 retval;
-	u16 readout;
 	struct device_node *np = bcl_dev->device->of_node;
 
 	ret = of_property_read_u32(np, "google,ifpmic", &retval);
@@ -1481,6 +1525,7 @@ static int google_set_intf_pmic(struct bcl_device *bcl_dev, struct platform_devi
 		bcl_dev->pmic_irq = ret;
 	}
 
+	INIT_DELAYED_WORK(&bcl_dev->rd_last_curr_work, google_bcl_rd_last_curr);
 
 	if (np) {
 		ret = of_property_read_u32(np, "batoilo_lower", &retval);
@@ -1601,20 +1646,22 @@ static int google_set_intf_pmic(struct bcl_device *bcl_dev, struct platform_devi
 		}
 
 		/* Readout last current */
-		ret = max77779_external_fg_reg_read(bcl_dev->fg_pmic_dev,
-						    MAX77779_FG_MaxMinCurr,
-						    &readout);
-		if (ret < 0)
-			dev_err(bcl_dev->device, "bcl read of last current failed: %d\n", ret);
+		bcl_dev->last_curr_rd_retry_cnt = LAST_CURR_RD_CNT_MAX;
+		if (google_bcl_update_last_curr(bcl_dev) == -EAGAIN)
+			schedule_delayed_work(&bcl_dev->rd_last_curr_work,
+					      msecs_to_jiffies(TIMEOUT_5S));
 
-		readout &= MAX77779_FG_MaxMinCurr_MAXCURR_MASK;
-		readout = readout >> MAX77779_FG_MaxMinCurr_MAXCURR_SHIFT;
-		bcl_dev->last_current = readout;
-		dev_dbg(bcl_dev->device, "LAST CURRENT: %#x\n", bcl_dev->last_current);
 #if IS_ENABLED(CONFIG_SOC_ZUMAPRO)
 		bcl_dev->vimon_dev = max77779_get_dev(bcl_dev->device, "google,vimon");
 		if (!bcl_dev->vimon_dev) {
 			dev_err(bcl_dev->device, "Cannot find max77779 vimon\n");
+			return -ENODEV;
+		}
+		if (!bcl_dev->vimon_pwr_loop_en)
+			return 0;
+		ret = max77779_vimon_register_callback(bcl_dev);
+		if (ret < 0) {
+			dev_err(bcl_dev->device, "Cannot register max77779 vimon\n");
 			return -ENODEV;
 		}
 #endif
@@ -2393,6 +2440,7 @@ static int google_bcl_remove(struct platform_device *pdev)
 	debugfs_remove_recursive(bcl_dev->debug_entry);
 	cpu_pm_unregister_notifier(&bcl_dev->cpu_nb);
 	google_bcl_remove_thermal(bcl_dev);
+	wakeup_source_unregister(bcl_dev->ws);
 
 	return 0;
 }
