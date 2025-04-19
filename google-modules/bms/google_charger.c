@@ -708,9 +708,11 @@ static int info_usb_state(union gbms_ce_adapter_details *ad,
 
 	if (usb_psy) {
 		int voltage_now, current_now;
+		int tcpm_online;
 
 		/* TODO: handle POWER_SUPPLY_PROP_REAL_TYPE in qc-compat */
 		usb_type = PSY_GET_PROP(usb_psy, POWER_SUPPLY_PROP_USB_TYPE);
+
 		if (tcpm_psy) {
 			usbc_type = PSY_GET_PROP(tcpm_psy,
 						 POWER_SUPPLY_PROP_USB_TYPE);
@@ -723,12 +725,21 @@ static int info_usb_state(union gbms_ce_adapter_details *ad,
 						  &chg_drv->adapter_capabilities[ADAPTER_CAP_APDO],
 						  false);
 			}
+
+			tcpm_online = PSY_GET_PROP(tcpm_psy, POWER_SUPPLY_PROP_ONLINE);
+			if (tcpm_online == 2)
+				amperage_max = PSY_GET_PROP(tcpm_psy,
+							    POWER_SUPPLY_PROP_CURRENT_MAX);
+			else
+				amperage_max = PSY_GET_PROP(usb_psy,
+							    POWER_SUPPLY_PROP_CURRENT_MAX);
+		} else {
+			amperage_max = PSY_GET_PROP(usb_psy,
+							POWER_SUPPLY_PROP_CURRENT_MAX);
 		}
 
 		voltage_max = PSY_GET_PROP(usb_psy,
 					   POWER_SUPPLY_PROP_VOLTAGE_MAX);
-		amperage_max = PSY_GET_PROP(usb_psy,
-					    POWER_SUPPLY_PROP_CURRENT_MAX);
 		voltage_now = PSY_GET_PROP(usb_psy,
 					   POWER_SUPPLY_PROP_VOLTAGE_NOW);
 		current_now = PSY_GET_PROP(usb_psy,

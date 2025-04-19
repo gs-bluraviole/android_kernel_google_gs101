@@ -2166,6 +2166,10 @@ static bool max77759_is_full(struct max77759_chgr_data *data)
 	int vlimit = data->chg_term_voltage;
 	int ret, vbatt = 0;
 
+	/* Not in the last voltage index */
+	if (vlimit == 0)
+		return false;
+
 	/*
 	 * Set voltage level to leave CHARGER_DONE (BATT_RL_STATUS_DISCHARGE)
 	 * and enter BATT_RL_STATUS_RECHARGE. It sets STATUS_DISCHARGE again
@@ -2362,6 +2366,25 @@ static int max77759_set_online(struct max77759_chgr_data *data, bool online)
 	return ret;
 }
 
+#define MAX77759_CHG_TERM_VOL_TOLERANCE 50 /* 50mV */
+
+static int max77759_set_chg_term_voltage(struct max77759_chgr_data *data, int fv_uv)
+{
+	int vlimit = 0, msc_last = 0;
+
+	if (!data->msc_last_votable)
+		data->msc_last_votable = gvotable_election_get_handle("MSC_LAST");
+	if (!data->msc_last_votable)
+		return -EINVAL;
+
+	msc_last = gvotable_get_current_int_vote(data->msc_last_votable);
+	if (msc_last == 1)
+		vlimit = (fv_uv / 1000) - MAX77759_CHG_TERM_VOL_TOLERANCE;
+	data->chg_term_voltage = vlimit;
+
+	return msc_last;
+}
+
 static int max77759_psy_set_property(struct power_supply *psy,
 				     enum power_supply_property psp,
 				     const union power_supply_propval *pval)
@@ -2406,13 +2429,18 @@ static int max77759_psy_set_property(struct power_supply *psy,
 			power_supply_changed(data->psy);
 		break;
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX:
+	{
+		int msc_last;
+
 		ret = max77759_set_regulation_voltage(data, pval->intval);
 		pr_debug("%s: charge_voltage=%d (%d)\n",
 			__func__, pval->intval, ret);
 		if (ret)
 			break;
-		if (max77759_is_online(data) && pval->intval >= data->chg_term_voltage * 1000)
+		msc_last = max77759_set_chg_term_voltage(data, pval->intval);
+		if (max77759_is_online(data) && msc_last == 1)
 			ret = max77759_higher_headroom_enable(data, true);
+	}
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
 		ret = max77759_set_online(data, pval->intval != 0);
@@ -3295,17 +3323,10 @@ static int max77759_charger_probe(struct i2c_client *client,
 
 	INIT_DELAYED_WORK(&data->otg_fccm_worker, max77759_otg_fccm_worker);
 
-	ret = of_property_read_u32(dev->of_node, "max77759,chg-term-voltage",
-				   &data->chg_term_voltage);
-	if (ret < 0)
-		data->chg_term_voltage = 0;
-
 	ret = of_property_read_u32(dev->of_node, "max77759,chg-term-volt-debounce",
 				   &data->chg_term_volt_debounce);
 	if (ret < 0)
 		data->chg_term_volt_debounce = CHG_TERM_VOLT_DEBOUNCE;
-	if (data->chg_term_voltage == 0)
-		data->chg_term_volt_debounce = 0;
 
 	ret = of_property_read_u32(dev->of_node, "max77759,usb-otg-mv", &usb_otg_mv);
 	if (ret)

@@ -37,6 +37,7 @@ struct device_node;
 #define GBMS_CHG_TOPOFF_NB_LIMITS_MAX 10
 #define GBMS_AACR_DATA_MAX 10
 #define GBMS_AAFV_DATA_MAX 16
+#define GBMS_AAFV_VOLTAGE_OFFSET_SCALE 1000
 #define GBMS_AACT_NB_LIMITS_MAX 10
 #define GBMS_AACT_PROFILE_MAX 100
 
@@ -420,6 +421,8 @@ struct gbms_charging_event {
 
 	int aacp_version;
 	int aacc;
+	int aafv;
+	int max_charge_voltage;
 
 	/* health based charging */
 	struct batt_chg_health		ce_health;	/* updated on close */
@@ -603,27 +606,20 @@ void ttf_soc_init(struct ttf_soc_stats *dst);
 
 int ttf_tier_cstr(char *buff, int size, const struct ttf_tier_stat *t_stat);
 
-int ttf_tier_estimate(ktime_t *res,
-		      const struct batt_ttf_stats *ttf_stats,
-		      int temp_idx, int vbatt_idx,
-		      int capacity, int full_capacity);
+int ttf_tier_estimate(ktime_t *res, const struct batt_ttf_stats *ttf_stats,
+		      int temp_idx, int vbatt_idx, int capacity, int full_capacity);
 
-int ttf_stats_init(struct batt_ttf_stats *stats,
-		   struct device *device,
-		   int capacity_ma);
+int ttf_stats_init(struct batt_ttf_stats *stats, struct device_node *node, int capacity_ma);
 
 void ttf_stats_update(struct batt_ttf_stats *stats,
 	 	      struct gbms_charging_event *ce_data,
 		      bool force);
 
-int ttf_stats_cstr(char *buff, int size, const struct batt_ttf_stats *stats,
-		   bool verbose);
+int ttf_stats_cstr(char *buff, int size, const struct batt_ttf_stats *stats, bool verbose);
 
-int ttf_stats_sscan(struct batt_ttf_stats *stats,
-		    const char *buff, size_t size);
+int ttf_stats_sscan(struct batt_ttf_stats *stats, const char *buff, size_t size);
 
-struct batt_ttf_stats *ttf_stats_dup(struct batt_ttf_stats *dst,
-				     const struct batt_ttf_stats *src);
+struct batt_ttf_stats *ttf_stats_dup(struct batt_ttf_stats *dst, const struct batt_ttf_stats *src);
 
 __printf(2, 3)
 void ttf_log(const struct batt_ttf_stats *stats, const char *fmt, ...);
@@ -651,6 +647,7 @@ int gbms_read_aafv_limits(struct gbms_chg_profile *profile,
 int gbms_aafv_get_offset(const struct gbms_chg_profile *profile, const int cycles);
 bool gbms_aafv_offset_is_valid(const struct gbms_chg_profile *profile,
 			       const u32 offset, const u32 len);
+int gbms_aafv_get_last_entry(const struct gbms_chg_profile *profile);
 
 bool chg_state_is_disconnected(const union gbms_charger_state *chg_state);
 
@@ -716,6 +713,7 @@ enum bhi_algo {
 	BHI_ALGO_INDI		=  8, /* age criteria for Battery Service Test API b/253642456 */
 	BHI_ALGO_DTOOL		=  9, /* diagnostics for Cavalry b/304878620 */
 	BHI_ALGO_ACHI_FCR	= 10, /* average of FCR from history b/310501655*/
+	BHI_ALGO_ACHI_CARETAKER	= 11, /* same as ACHI_B + caretaker */
 	BHI_ALGO_MAX,
 };
 
