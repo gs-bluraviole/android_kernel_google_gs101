@@ -14,9 +14,8 @@
 #include <linux/sched.h>
 #include <linux/jiffies.h>
 #include <linux/pagemap.h>
-#include <linux/swap.h>
+
 #include "../../vh/include/sched.h"
-#include "../../vh/include/pixel_mm_hint.h"
 
 #define CREATE_TRACE_POINTS
 #include "pixel_mm_trace.h"
@@ -341,28 +340,4 @@ void rvh_vmscan_kswapd_done(
 	delta_nr_reclaimed = events[PGSTEAL_KSWAPD] - wake_nr_reclaimed;
 
 	trace_pixel_mm_kswapd_done(delta_nr_scanned, delta_nr_reclaimed);
-}
-
-void vh_vmscan_tune_swappiness(void *data, int *swappiness)
-{
-	enum mm_hint_mode hint = get_mm_hint_mode();
-	bool file_cache_enough = is_file_cache_enough();
-
-	if (hint == MM_HINT_NONE)
-		return;
-
-	if (file_cache_enough) {
-		// speed up kswapd & direct reclaim cases
-		*swappiness = 0;
-		return;
-	}
-
-	if (!current_is_kswapd() && !file_cache_enough &&
-		is_critical_process(current)) {
-		/*
-		 * only allow critical process to reclaim further
-		 * when file cache is NOT enough for direct reclaim case.
-		 */
-		*swappiness = get_critical_swappiness();
-	}
 }

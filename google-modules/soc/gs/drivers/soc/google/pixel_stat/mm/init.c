@@ -100,10 +100,6 @@ static int pixel_stat_mm_init(void)
 	if (ret)
 		return ret;
 
-	ret = register_trace_android_vh_tune_swappiness(vh_vmscan_tune_swappiness ,NULL);
-	if (ret)
-		return ret;
-
 	return 0;
 }
 
