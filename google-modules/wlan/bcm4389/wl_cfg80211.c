@@ -1,7 +1,7 @@
 /*
  * Linux cfg80211 driver
  *
- * Copyright (C) 2024, Broadcom.
+ * Copyright (C) 2025, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -16044,9 +16044,6 @@ static void wl_init_event_handler(struct bcm_cfg80211 *cfg)
 	cfg->evt_handler[WLC_E_START] = wl_notify_connect_status;
 	cfg->evt_handler[WLC_E_AUTH_IND] = wl_notify_connect_status;
 	cfg->evt_handler[WLC_E_ASSOC_RESP_IE] = wl_notify_connect_status;
-#ifdef PNO_SUPPORT
-	cfg->evt_handler[WLC_E_PFN_NET_FOUND] = wl_notify_pfn_status;
-#endif /* PNO_SUPPORT */
 #ifdef WL_SCHED_SCAN
 	cfg->evt_handler[WLC_E_PFN_PARTIAL_RESULT] = wl_cfgscan_pfn_scanresult_handler;
 #endif /* WL_SCHED_SCAN */

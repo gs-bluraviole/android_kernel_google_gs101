@@ -2,7 +2,7 @@
  * Broadcom Dongle Host Driver (DHD), Linux-specific network interface.
  * Basically selected code segments from usb-cdc.c and usb-rndis.c
  *
- * Copyright (C) 2024, Broadcom.
+ * Copyright (C) 2025, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -6917,6 +6917,12 @@ dhd_open(struct net_device *net)
 	int32 ret = 0;
 
 	DHD_ERROR(("%s: ENTER\n", __FUNCTION__));
+
+	if (OSL_ATOMIC_READ(dhdp->osh, &reboot_in_progress) >= 0) {
+		DHD_ERROR(("%s: failed to open. reboot in progress", __FUNCTION__));
+		return BCME_ERROR;
+	}
+
 #if defined(PREVENT_REOPEN_DURING_HANG)
 	/* WAR : to prevent calling dhd_open abnormally in quick succession after hang event */
 	if (dhd->pub.hang_was_sent == 1) {
@@ -8335,6 +8341,7 @@ dhd_lookup_map(osl_t *osh, char *fname, uint32 pc, char *pc_fn,
 	char func2[DHD_FUNC_STR_LEN] = "\0";
 	uint8 count = 0;
 	int num, len = 0, offset;
+	int alloc_size;
 
 	DHD_TRACE(("%s: fname %s pc 0x%x lr 0x%x \n",
 		__FUNCTION__, fname, pc, lr));
@@ -8344,7 +8351,8 @@ dhd_lookup_map(osl_t *osh, char *fname, uint32 pc, char *pc_fn,
 	}
 
 	/* Allocate 1 byte more than read_size to terminate it with NULL */
-	raw_fmts = MALLOCZ(osh, read_size + 1);
+	alloc_size = read_size + 1;
+	raw_fmts = MALLOCZ(osh, alloc_size);
 	if (raw_fmts == NULL) {
 		DHD_ERROR(("%s: Failed to allocate raw_fmts memory \n",
 			__FUNCTION__));
@@ -8536,6 +8544,9 @@ fail:
 	}
 	if (!(count & LR_FOUND_BIT)) {
 		sprintf(lr_fn, "0x%08x", lr);
+	}
+	if (raw_fmts) {
+		MFREE(osh, raw_fmts, alloc_size);
 	}
 	return err;
 }
