@@ -373,11 +373,6 @@ DECLARE_HOOK(android_vh_sched_pelt_multiplier,
 	TP_PROTO(unsigned int old, unsigned int cur, int *ret),
 	TP_ARGS(old, cur, ret));
 
-DECLARE_HOOK(android_vh_map_util_freq,
-	TP_PROTO(unsigned long util, unsigned long freq,
-		unsigned long cap, unsigned long *next_freq),
-	TP_ARGS(util, freq, cap, next_freq));
-
 DECLARE_RESTRICTED_HOOK(android_rvh_set_cpus_allowed_comm,
 	TP_PROTO(struct task_struct *p, const struct cpumask *new_mask),
 	TP_ARGS(p, new_mask), 1);
