@@ -38,6 +38,14 @@ ifneq ($(CONFIG_SOC_GOOGLE),)
   $(foreach var, $(ARCH_CONFIGS), $(eval $(var) :=))
 endif
 
+# For pixel build, unset SOC related configs which are defined in DHD
+ifneq ($(CONFIG_SOC_GOOGLE),)
+  # Find configs in DHD code with prefix "CONFIG_ARCH_"
+  ARCH_CONFIGS := $(shell grep -rEoh "CONFIG_ARCH_([0-9]|[A-Z]|_)+" $(BCMDHD_ROOT)/* | sort | uniq)
+  # Unset these CONFIG_ARCH_* configs if it is defined in kernel layer
+  $(foreach var, $(ARCH_CONFIGS), $(eval $(var) :=))
+endif
+
 #####################
 # SDIO/PCIe Basic feature
 #####################
